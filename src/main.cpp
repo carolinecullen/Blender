@@ -31,8 +31,7 @@ public:
 	WindowManager * windowManager = nullptr;
 
 	// Our shader program
-	std::shared_ptr<Program> prog;
-	// std::shared_ptr<Program> texProg;
+	std::shared_ptr<Program> shapeProg;
 	std::shared_ptr<Program> groundProg;
 
 	// Shape to be used (from obj file)
@@ -52,9 +51,6 @@ public:
 	GLuint quad_vertexbuffer;
 
 	//reference to texture FBO
-	GLuint frameBuf[2];
-	GLuint texBuf[2];
-	GLuint depthBuf;
 
 	bool FirstTime = true;
 	bool Moving = false;
@@ -205,6 +201,31 @@ public:
 		groundProg->addAttribute("vertNor");
 	}
 
+	void shapeSetUp(const std::string& resourceDirectory)
+	{
+		// Initialize the GLSL program.
+		shapeProg = make_shared<Program>();
+		shapeProg->setVerbose(true);
+		shapeProg->setShaderNames(
+			resourceDirectory + "/simple_vert.glsl",
+			resourceDirectory + "/simple_frag.glsl");
+		if (! shapeProg->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		shapeProg->addUniform("P");
+		shapeProg->addUniform("V");
+		shapeProg->addUniform("M");
+		shapeProg->addUniform("MatAmb");
+		shapeProg->addUniform("MatDif");
+		shapeProg->addUniform("lightPos");
+	    shapeProg->addUniform("MatSpec");
+	    shapeProg->addUniform("shine");
+		shapeProg->addAttribute("vertPos");
+		shapeProg->addAttribute("vertNor");
+	}
+
 	void init(const std::string& resourceDirectory)
 	{
 		int width, height;
@@ -217,62 +238,8 @@ public:
 		// Enable z-buffer test.
 		glEnable(GL_DEPTH_TEST);
 		groundSetUp(resourceDirectory);
+		shapeSetUp(resourceDirectory);
 
-		// Initialize the GLSL program.
-		prog = make_shared<Program>();
-		prog->setVerbose(true);
-		prog->setShaderNames(
-			resourceDirectory + "/simple_vert.glsl",
-			resourceDirectory + "/simple_frag.glsl");
-		if (! prog->init())
-		{
-			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
-			exit(1);
-		}
-		prog->addUniform("P");
-		prog->addUniform("V");
-		prog->addUniform("M");
-		prog->addUniform("MatAmb");
-		prog->addUniform("MatDif");
-		prog->addUniform("lightPos");
-	    prog->addUniform("MatSpec");
-	    prog->addUniform("shine");
-		prog->addAttribute("vertPos");
-		prog->addAttribute("vertNor");
-
-
-		//create two frame buffer objects to toggle between
-		// glGenFramebuffers(2, frameBuf);
-		// glGenTextures(2, texBuf);
-		// glGenRenderbuffers(1, &depthBuf);
-		// createFBO(frameBuf[0], texBuf[0]);
-
-		// //set up depth necessary as rendering a mesh that needs depth test
-		// glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
-		// glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-		// glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
-
-		// //more FBO set up
-		// GLenum DrawBuffers[1] = {GL_COLOR_ATTACHMENT0};
-		// glDrawBuffers(1, DrawBuffers);
-		// createFBO(frameBuf[1], texBuf[1]);
-
-		// texProg = make_shared<Program>();
-		// texProg->setVerbose(true);
-		// texProg->setShaderNames(
-		// 	resourceDirectory + "/pass_vert.glsl",
-		// 	resourceDirectory + "/tex_fragH.glsl");
-		// if (! texProg->init())
-		// {
-		// 	std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
-		// 	exit(1);
-		// }
-		// texProg->addUniform("texBuf");
-		// texProg->addAttribute("vertPos");
-		// texProg->addUniform("dir");
-		// texProg->addUniform("P");
-		// texProg->addUniform("V");
-		// texProg->addUniform("M");
 	 }
 
 	void initGeom(const std::string& resourceDirectory)
@@ -297,68 +264,12 @@ public:
 		bushShape->loadMesh(resourceDirectory + "/bush.obj");
 		bushShape->resize();
 		bushShape->init();
-
-
-		initQuad();
 	}
 
-	/**** geometry set up for a quad *****/
-	void initQuad()
-	{
-		//now set up a simple quad for rendering FBO
-		glGenVertexArrays(1, &quad_VertexArrayID);
-		glBindVertexArray(quad_VertexArrayID);
 
-		static const GLfloat g_quad_vertex_buffer_data[] =
-		{
-			-1.2f, -1.2f, 0.0f,
-			 1.2f, -1.2f, 0.0f,
-			-1.2f,  1.2f, 0.0f,
-			-1.2f,  1.2f, 0.0f,
-			 1.2f, -1.2f, 0.0f,
-			 1.2f,  1.2f, 0.0f,
-		};
-
-		glGenBuffers(1, &quad_vertexbuffer);
-		glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(g_quad_vertex_buffer_data), g_quad_vertex_buffer_data, GL_STATIC_DRAW);
-	}
-
-	/* Helper function to create the framebuffer object and
-		associated texture to write to */
-	// void createFBO(GLuint& fb, GLuint& tex)
-	// {
-	// 	//initialize FBO
-	// 	int width, height;
-	// 	glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
-
-	// 	//set up framebuffer
-	// 	glBindFramebuffer(GL_FRAMEBUFFER, fb);
-	// 	//set up texture
-	// 	glBindTexture(GL_TEXTURE_2D, tex);
-
-	// 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	// 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	// 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	// 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	// 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-
-	// 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
-
-	// 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-	// 	{
-	// 		cout << "Error setting up frame buffer - exiting" << endl;
-	// 		exit(0);
-	// 	}
-	// }
-
-	// set up view matricies and stuff in here 
 	void render()
 	{
-		bool drawQuad = false;
 		auto ViewUser = make_shared<MatrixStack>();
-		auto ViewMonitor = make_shared<MatrixStack>();
-		// calculate user view matrix
 		// DO NOT TOUCH THE CAMERA =================================
 	
 		x = cos(radians(phi))*cos(radians(theta));
@@ -392,32 +303,12 @@ public:
 			ViewUser->lookAt(vec3(cameraPos.x, 1.0, cameraPos.z), forward + vec3(cameraPos.x, 1.0, cameraPos.z), up);
 
 		MatrixStack *userViewPtr = ViewUser.get();
-
-		// ViewMonitor->pushMatrix();
-		// 	ViewMonitor->loadIdentity();
-		// 	ViewMonitor->pushMatrix();
-		// 	ViewMonitor->lookAt(vec3(0.0, 0.2 , 15.0), -forward, up);
-
-		// MatrixStack *monitorViewPtr = ViewMonitor.get();
-
-		// DO NOT TOUCH THE CAMERA =================================
-		// draw scene from quad perspective first ie dont draw the quad
-
-
-		// glBindFramebuffer(GL_FRAMEBUFFER, frameBuf[0]);
-		// drawScene(drawQuad, monitorViewPtr);
-
-		// draw scene with quad
-		// drawQuad = true;
-		
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		drawScene(drawQuad, userViewPtr);
+		drawScene(userViewPtr);
 		 
 	}
 
 	// have booleon in here for whether to draw the quad or not
-	void drawScene(bool drawQuad, MatrixStack* View)
+	void drawScene(MatrixStack* View)
 	{
 		// Get current frame buffer size.
 		int width, height;
@@ -437,34 +328,6 @@ public:
 		// Apply perspective projection.
 		Projection->pushMatrix();
 		Projection->perspective(45.0f, aspect, 0.01f, 100.0f);
-
-		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ TEXTURE PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-		// if(drawQuad)
-		// {
-		// 	glActiveTexture(GL_TEXTURE0);
-		// 	glBindTexture(GL_TEXTURE_2D, texBuf[0]);
-
-		// 	// example applying of 'drawing' the FBO texture - change shaders
-		// 	texProg->bind();
-		// 	glUniform1i(texProg->getUniform("texBuf"), 0);
-		// 	glUniform2f(texProg->getUniform("dir"), -1, 0);
-		// 	glUniformMatrix4fv(texProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
-		// 	glUniformMatrix4fv(texProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
-		// 	Model->pushMatrix();
-		// 	Model->loadIdentity();
-		// 		Model->pushMatrix();
-		// 		Model->translate(vec3(0.0, 0.2, 15.0));
-		// 		glUniformMatrix4fv(texProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-		// 		glEnableVertexAttribArray(0);
-		// 		glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-		// 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
-		// 		glDrawArrays(GL_TRIANGLES, 0, 6);
-		// 		glDisableVertexAttribArray(0);
-		// 		Model->popMatrix();
-		// 	Model->popMatrix();
-		// 	texProg->unbind();
-		// }
 
 		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GROUND PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 		
@@ -496,14 +359,14 @@ public:
 		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~ OBJECT PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 		//Draw our scene - two meshes - right now to a texture
-		prog->bind();
+		shapeProg->bind();
 		Projection->pushMatrix();
-		Program *progPtr = prog.get();
+		Program *progPtr = shapeProg.get();
 		Projection->perspective(45.0f, aspect, 0.01f, 100.0f);
 
-		glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
-		glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
-		glUniform3f(prog->getUniform("lightPos"), -500.0, 500.0, 500.0);
+		glUniformMatrix4fv(shapeProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
+		glUniformMatrix4fv(shapeProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
+		glUniform3f(shapeProg->getUniform("lightPos"), -500.0, 500.0, 500.0);
 		// globl transforms for 'camera' (you will fix this now!)
 		Model->pushMatrix();
 			Model->loadIdentity();
@@ -519,8 +382,8 @@ public:
 				Model->rotate(3.14f + theta + sin(glfwGetTime()) + cos(glfwGetTime()), vec3(0, 1, 0));
 				// Model->rotate(radians(-90.f), vec3(1, 0, 0));
 				SetMaterial(i % 10, progPtr);
-				glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-				bunnyShape->draw(prog);
+				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+				bunnyShape->draw(shapeProg);
 				Model->popMatrix();
 				theta += 6.28f / 10.f;
 			}
@@ -530,7 +393,7 @@ public:
 		Projection->popMatrix();
 		View->popMatrix();
 
-		prog->unbind();
+		shapeProg->unbind();
 
 	
 	}
