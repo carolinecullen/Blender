@@ -12,6 +12,7 @@ Blender
 #include "Shape.h"
 #include "WindowManager.h"
 #include "GLTextureWriter.h"
+#include "Particle.h"
 
 // value_ptr for glm
 #include <glm/gtc/type_ptr.hpp>
@@ -33,6 +34,7 @@ public:
 	// Our shader program
 	shared_ptr<Program> shapeProg;
 	shared_ptr<Program> groundProg;
+	shared_ptr<Program> particleProg;
 
 	//ground info
 	GLuint GrndBuffObj, GrndNorBuffObj, GrndTexBuffObj, GIndxBuffObj;
@@ -50,7 +52,7 @@ public:
 	shared_ptr<Shape> bushShape;
 
 	// Contains vertex information for OpenGL
-	GLuint VertexArrayID;
+	GLuint GroundVertexArrayID;
 
 	// Data necessary to give our triangle to OpenGL
 	GLuint VertexBufferID;
@@ -59,7 +61,22 @@ public:
 	GLuint quad_VertexArrayID;
 	GLuint quad_vertexbuffer;
 
-	//reference to texture FBO
+	//stuff necessary for particles
+	vector<std::shared_ptr<Particle>> particles;
+	shared_ptr<Texture> particleTexture;
+	GLuint ParticleVertexArrayID;
+	int numP = 300;
+	GLfloat points[900];
+	GLfloat pointColors[1200];
+	GLuint particlePointsBuffer;
+	GLuint particleColorBuffer;
+	float t0_disp = 0.0f;
+	float t_disp = 0.0f;
+	bool keyToggles[256] = { false };
+	float t = 0.0f; //reset in init
+	float h = 0.01f;
+	glm::vec3 g = glm::vec3(0.0f, -0.01f, 0.0f);
+
 
 	bool FirstTime = true;
 	bool Moving = false;
@@ -195,6 +212,12 @@ public:
 		groundTexture->init();
 		groundTexture->setUnit(0);
 		groundTexture->setWrapModes(GL_REPEAT, GL_REPEAT);
+
+		particleTexture = make_shared<Texture>();
+		particleTexture->setFilename(resourceDirectory + "/alpha.bmp");
+		particleTexture->init();
+		particleTexture->setUnit(1);
+		particleTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
 	}
 
 	void groundSetUp(const std::string& resourceDirectory)
@@ -245,6 +268,25 @@ public:
 		shapeProg->addAttribute("vertNor");
 	}
 
+	void particleSetUp(const std::string& resourceDirectory)
+	{
+		particleProg = make_shared<Program>();
+		particleProg->setVerbose(true);
+		particleProg->setShaderNames(
+			resourceDirectory + "/particle_vert.glsl",
+			resourceDirectory + "/particle_frag.glsl");
+		if (! particleProg->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		particleProg->addUniform("P");
+		particleProg->addUniform("V");
+		particleProg->addUniform("M");
+		particleProg->addUniform("alphaTexture");
+		particleProg->addAttribute("vertPos");
+	}
+
 	void init(const std::string& resourceDirectory)
 	{
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
@@ -257,11 +299,30 @@ public:
 
 		shapeSetUp(resourceDirectory);
 
-		initTex(resourceDirectory);
+		// initTex(resourceDirectory);
 
 		groundSetUp(resourceDirectory);
 
+		CHECKED_GL_CALL(glEnable(GL_DEPTH_TEST));
+		CHECKED_GL_CALL(glEnable(GL_BLEND));
+		CHECKED_GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+		CHECKED_GL_CALL(glPointSize(14.0f));
+
+		particleSetUp(resourceDirectory);
+
 	 }
+
+	void initParticles()
+	{
+		int n = numP;
+
+		for (int i = 0; i < n; ++ i)
+		{
+			auto particle = make_shared<Particle>();
+			particles.push_back(particle);
+			particle->load();
+		}
+	}
 
 	void initGeom(const std::string& resourceDirectory)
 	{
@@ -287,7 +348,72 @@ public:
 		bushShape->init();
 
 		initQuad();
+
+		CHECKED_GL_CALL(glGenVertexArrays(1, &ParticleVertexArrayID));
+		CHECKED_GL_CALL(glBindVertexArray(ParticleVertexArrayID));
+		// generate vertex buffer to hand off to OGL - using instancing
+		CHECKED_GL_CALL(glGenBuffers(1, &particlePointsBuffer));
+		// set the current state to focus on our vertex buffer
+		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, particlePointsBuffer));
+		// actually memcopy the data - only do this once
+		CHECKED_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(points), NULL, GL_STREAM_DRAW));
+
+		CHECKED_GL_CALL(glGenBuffers(1, &particleColorBuffer));
+		// set the current state to focus on our vertex buffer
+		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, particleColorBuffer));
+		// actually memcopy the data - only do this once
+		CHECKED_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(pointColors), NULL, GL_STREAM_DRAW));
 	}
+
+	void updateGeom()
+	{
+		glm::vec3 pos;
+		glm::vec4 col;
+
+		// go through all the particles and update the CPU buffer
+		for (int i = 0; i < numP; i++)
+		{
+			pos = particles[i]->getPosition();
+			col = particles[i]->getColor();
+			points[i * 3 + 0] = pos.x;
+			points[i * 3 + 1] = pos.y;
+			points[i * 3 + 2] = pos.z;
+			pointColors[i * 4 + 0] = col.r + col.a / 10.f;
+			pointColors[i * 4 + 1] = col.g + col.g / 10.f;
+			pointColors[i * 4 + 2] = col.b + col.b / 10.f;
+			pointColors[i * 4 + 3] = col.a;
+		}
+
+		// update the GPU data
+		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, particlePointsBuffer));
+		CHECKED_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(points), NULL, GL_STREAM_DRAW));
+		CHECKED_GL_CALL(glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * numP * 3, points));
+
+		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, particleColorBuffer));
+		CHECKED_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(pointColors), NULL, GL_STREAM_DRAW));
+		CHECKED_GL_CALL(glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * numP * 4, pointColors));
+
+		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, 0));
+	}
+
+	void updateParticles()
+	{
+		// update the particles
+		for (auto particle : particles)
+		{
+			particle->update(t, h, g, keyToggles);
+		}
+		t += h;
+
+		// Sort the particles by Z
+		auto temp = make_shared<MatrixStack>();
+		temp->rotate(y, vec3(0, 1, 0));
+
+		ParticleSorter sorter;
+		sorter.C = temp->topMatrix();
+		std::sort(particles.begin(), particles.end(), sorter);
+	}
+
 
 	/**** geometry set up for ground plane *****/
 	void initQuad()
@@ -321,10 +447,10 @@ public:
 
 		unsigned short idx[] = {0, 1, 2, 0, 2, 3};
 
-		GLuint VertexArrayID;
+		GLuint GroundVertexArrayID;
 		//generate the VAO
-		glGenVertexArrays(1, &VertexArrayID);
-		glBindVertexArray(VertexArrayID);
+		glGenVertexArrays(1, &GroundVertexArrayID);
+		glBindVertexArray(GroundVertexArrayID);
 
 		gGiboLen = 6;
 		glGenBuffers(1, &GrndBuffObj);
@@ -389,7 +515,6 @@ public:
 
 		MatrixStack *userViewPtr = ViewUser.get();
 
-		
 		auto Projection = make_shared<MatrixStack>();
 
 		Projection->pushMatrix();
@@ -399,11 +524,49 @@ public:
 		
 		drawScene(userViewPtr, projectionPtr);
 		drawGround(userViewPtr, projectionPtr);
+		drawParticles(userViewPtr, projectionPtr);
 
 		Projection->popMatrix();
 		ViewUser->popMatrix();
 		ViewUser->popMatrix();
 		 
+	}
+
+	void drawParticles(MatrixStack* View, MatrixStack* Projection)
+	{
+		particleProg->bind();
+		updateParticles();
+		updateGeom();
+
+		auto Model = make_shared<MatrixStack>();
+		Model->pushMatrix();
+			Model->loadIdentity();
+
+		particleTexture->bind(particleProg->getUniform("alphaTexture"));
+		CHECKED_GL_CALL(glUniformMatrix4fv(particleProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix())));
+		CHECKED_GL_CALL(glUniformMatrix4fv(particleProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix())));
+		CHECKED_GL_CALL(glUniformMatrix4fv(particleProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix())));
+
+		CHECKED_GL_CALL(glEnableVertexAttribArray(0));
+		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, particlePointsBuffer));
+		CHECKED_GL_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0));
+
+		CHECKED_GL_CALL(glEnableVertexAttribArray(1));
+		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, particleColorBuffer));
+		CHECKED_GL_CALL(glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (void*) 0));
+
+		CHECKED_GL_CALL(glVertexAttribDivisor(0, 1));
+		CHECKED_GL_CALL(glVertexAttribDivisor(1, 1));
+		// Draw the points !
+		CHECKED_GL_CALL(glDrawArraysInstanced(GL_POINTS, 0, 1, numP));
+
+		CHECKED_GL_CALL(glVertexAttribDivisor(0, 0));
+		CHECKED_GL_CALL(glVertexAttribDivisor(1, 0));
+		CHECKED_GL_CALL(glDisableVertexAttribArray(0));
+		CHECKED_GL_CALL(glDisableVertexAttribArray(1));
+
+		Model->popMatrix();
+		particleProg->unbind();
 	}
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GROUND PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -423,7 +586,6 @@ public:
 		glBindBuffer(GL_ARRAY_BUFFER, GrndTexBuffObj);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-		// draw!
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, GIndxBuffObj);
 		glDrawElements(GL_TRIANGLES, gGiboLen, GL_UNSIGNED_SHORT, 0);
 
@@ -462,8 +624,8 @@ public:
 		// Create the matrix stacks
 		auto Model = make_shared<MatrixStack>();
 		Program *sProgPtr = shapeProg.get();
-		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~ OBJECT PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~ OBJECT PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 		//Draw our scene - two meshes - right now to a texture
 		shapeProg->bind();
 
@@ -606,6 +768,8 @@ int main(int argc, char **argv)
 	// may need to initialize or set up different data and state
 
 	application->init(resourceDir);
+	application->initTex(resourceDir);
+	application->initParticles();
 	application->initGeom(resourceDir);
 
 	// Loop until the user closes the window.
