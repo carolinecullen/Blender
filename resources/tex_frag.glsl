@@ -1,10 +1,16 @@
 #version 330 core
+uniform sampler2D Texture0;
 
-in vec2 texCoord;
-out vec4 color;
-uniform sampler2D texBuf;
+in vec2 vTexCoord;
+in float dCo;
+out vec4 Outcolor;
 
-/* just pass through the texture color we will add to this next lab */
-void main(){
-   color = vec4(texture( texBuf, texCoord ).rgb, 1);
+void main() {
+
+    vec4 texColor0 = texture(Texture0, vTexCoord);
+ 
+  	Outcolor = dCo*texColor0;
+  
+	// Outcolor = vec4(vTexCoord.s, vTexCoord.t, 0, 1);
 }
+

@@ -29,10 +29,19 @@ class Application : public EventCallbacks
 public:
 
 	WindowManager * windowManager = nullptr;
-
+	int width, height;
 	// Our shader program
-	std::shared_ptr<Program> shapeProg;
-	std::shared_ptr<Program> groundProg;
+	shared_ptr<Program> shapeProg;
+	shared_ptr<Program> groundProg;
+
+	//ground info
+	GLuint GrndBuffObj, GrndNorBuffObj, GrndTexBuffObj, GIndxBuffObj;
+	shared_ptr<Texture> groundTexture;
+	int gGiboLen;
+
+	//transforms for the world
+	vec3 worldTrans = vec3(0);
+	float worldScale = 1.0;
 
 	// Shape to be used (from obj file)
 	shared_ptr<Shape> sphereShape;
@@ -45,7 +54,7 @@ public:
 
 	// Data necessary to give our triangle to OpenGL
 	GLuint VertexBufferID;
-    GLuint IndexBufferID;
+
 	//geometry for texture render
 	GLuint quad_VertexArrayID;
 	GLuint quad_vertexbuffer;
@@ -177,13 +186,25 @@ public:
 		glViewport(0, 0, width, height);
 	}
 
+	// Code to load in textures
+
+	void initTex(const std::string& resourceDirectory)
+	{
+	 	groundTexture = make_shared<Texture>();
+		groundTexture->setFilename(resourceDirectory + "/grass.jpg");
+		groundTexture->init();
+		groundTexture->setUnit(0);
+		groundTexture->setWrapModes(GL_REPEAT, GL_REPEAT);
+	}
+
 	void groundSetUp(const std::string& resourceDirectory)
 	{
+		//initialize the textures we might use
 		groundProg = make_shared<Program>();
 		groundProg->setVerbose(true);
 		groundProg->setShaderNames(
-			resourceDirectory + "/simple_vert.glsl",
-			resourceDirectory + "/simple_frag.glsl");
+			resourceDirectory + "/tex_vert.glsl",
+			resourceDirectory + "/tex_frag.glsl");
 		if (! groundProg->init())
 		{
 			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
@@ -192,13 +213,11 @@ public:
 		groundProg->addUniform("P");
 		groundProg->addUniform("V");
 		groundProg->addUniform("M");
-		groundProg->addUniform("MatAmb");
-		groundProg->addUniform("MatDif");
-		groundProg->addUniform("lightPos");
-	    groundProg->addUniform("MatSpec");
-	    groundProg->addUniform("shine");
+		groundProg->addUniform("Texture0");
+		groundProg->addUniform("texNum");
 		groundProg->addAttribute("vertPos");
 		groundProg->addAttribute("vertNor");
+		groundProg->addAttribute("vertTex");
 	}
 
 	void shapeSetUp(const std::string& resourceDirectory)
@@ -207,8 +226,8 @@ public:
 		shapeProg = make_shared<Program>();
 		shapeProg->setVerbose(true);
 		shapeProg->setShaderNames(
-			resourceDirectory + "/simple_vert.glsl",
-			resourceDirectory + "/simple_frag.glsl");
+			resourceDirectory + "/phong_vert.glsl",
+			resourceDirectory + "/phong_frag.glsl");
 		if (! shapeProg->init())
 		{
 			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
@@ -228,17 +247,19 @@ public:
 
 	void init(const std::string& resourceDirectory)
 	{
-		int width, height;
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 		GLSL::checkVersion();
 
-		// cTheta = 0;
 		// Set background color.
 		glClearColor(.12f, .34f, .56f, 1.0f);
 		// Enable z-buffer test.
 		glEnable(GL_DEPTH_TEST);
-		groundSetUp(resourceDirectory);
+
 		shapeSetUp(resourceDirectory);
+
+		initTex(resourceDirectory);
+
+		groundSetUp(resourceDirectory);
 
 	 }
 
@@ -264,14 +285,76 @@ public:
 		bushShape->loadMesh(resourceDirectory + "/bush.obj");
 		bushShape->resize();
 		bushShape->init();
+
+		initQuad();
+	}
+
+	/**** geometry set up for ground plane *****/
+	void initQuad()
+	{
+		float g_groundSize = 20;
+		float g_groundY = -1.5;
+
+		// A x-z plane at y = g_groundY of dim[-g_groundSize, g_groundSize]^2
+		float GrndPos[] = {
+			-g_groundSize, g_groundY, -g_groundSize,
+			-g_groundSize, g_groundY,  g_groundSize,
+			 g_groundSize, g_groundY,  g_groundSize,
+			 g_groundSize, g_groundY, -g_groundSize
+		};
+
+		float GrndNorm[] = {
+			0, 1, 0,
+			0, 1, 0,
+			0, 1, 0,
+			0, 1, 0,
+			0, 1, 0,
+			0, 1, 0
+		};
+
+		float GrndTex[] = {
+			0, 0, // back
+			0, 1,
+			1, 1,
+			1, 0
+		};
+
+		unsigned short idx[] = {0, 1, 2, 0, 2, 3};
+
+		GLuint VertexArrayID;
+		//generate the VAO
+		glGenVertexArrays(1, &VertexArrayID);
+		glBindVertexArray(VertexArrayID);
+
+		gGiboLen = 6;
+		glGenBuffers(1, &GrndBuffObj);
+		glBindBuffer(GL_ARRAY_BUFFER, GrndBuffObj);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GrndPos), GrndPos, GL_STATIC_DRAW);
+
+		glGenBuffers(1, &GrndNorBuffObj);
+		glBindBuffer(GL_ARRAY_BUFFER, GrndNorBuffObj);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GrndNorm), GrndNorm, GL_STATIC_DRAW);
+
+		glGenBuffers(1, &GrndTexBuffObj);
+		glBindBuffer(GL_ARRAY_BUFFER, GrndTexBuffObj);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GrndTex), GrndTex, GL_STATIC_DRAW);
+
+		glGenBuffers(1, &GIndxBuffObj);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, GIndxBuffObj);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
 	}
 
 
 	void render()
 	{
-		auto ViewUser = make_shared<MatrixStack>();
-		// DO NOT TOUCH THE CAMERA =================================
-	
+
+		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
+		glViewport(0, 0, width, height);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		float aspect = width/(float)height;
+
 		x = cos(radians(phi))*cos(radians(theta));
 		y = sin(radians(phi));
 		z = cos(radians(phi))*sin(radians(theta));
@@ -297,72 +380,92 @@ public:
 			cameraPos += sides * MOVEMENT_SPEED;
 		}
 
+		auto ViewUser = make_shared<MatrixStack>();
+
 		ViewUser->pushMatrix();
 			ViewUser->loadIdentity();
 			ViewUser->pushMatrix();
 			ViewUser->lookAt(vec3(cameraPos.x, 1.0, cameraPos.z), forward + vec3(cameraPos.x, 1.0, cameraPos.z), up);
 
 		MatrixStack *userViewPtr = ViewUser.get();
-		drawScene(userViewPtr);
-		 
-	}
 
-	// have booleon in here for whether to draw the quad or not
-	void drawScene(MatrixStack* View)
-	{
-		// Get current frame buffer size.
-		int width, height;
-		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
-		glViewport(0, 0, width, height);
-
-
-		// Clear framebuffer.
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		/* Leave this code to just draw the meshes alone */
-		float aspect = width/(float)height;
-
-		// Create the matrix stacks
+		
 		auto Projection = make_shared<MatrixStack>();
-		auto Model = make_shared<MatrixStack>();
-		// Apply perspective projection.
+
 		Projection->pushMatrix();
 		Projection->perspective(45.0f, aspect, 0.01f, 100.0f);
 
-		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GROUND PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+		MatrixStack *projectionPtr = Projection.get();
 		
-		
+		drawScene(userViewPtr, projectionPtr);
+		drawGround(userViewPtr, projectionPtr);
 
+		Projection->popMatrix();
+		ViewUser->popMatrix();
+		ViewUser->popMatrix();
+		 
+	}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GROUND PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	void renderGround()
+	{
+
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, GrndBuffObj);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glEnableVertexAttribArray(1);
+		glBindBuffer(GL_ARRAY_BUFFER, GrndNorBuffObj);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glEnableVertexAttribArray(2);
+		glBindBuffer(GL_ARRAY_BUFFER, GrndTexBuffObj);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+		// draw!
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, GIndxBuffObj);
+		glDrawElements(GL_TRIANGLES, gGiboLen, GL_UNSIGNED_SHORT, 0);
+
+		glDisableVertexAttribArray(0);
+		glDisableVertexAttribArray(1);
+		glDisableVertexAttribArray(2);
+	}
+
+	void drawGround(MatrixStack* View, MatrixStack* Projection)
+	{		
+		auto Model = make_shared<MatrixStack>();
+		// glBindFramebuffer(GL_FRAMEBUFFER, 1);
 		groundProg->bind();
-		Program *gProgPtr = groundProg.get();
 		glUniformMatrix4fv(groundProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(groundProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
-		glUniform3f(groundProg->getUniform("lightPos"), -500.0, 500.0, 500.0);
-
 		// globl transforms for 'camera' (you will fix this now!)
 		Model->pushMatrix();
 			Model->loadIdentity();
 				Model->pushMatrix();
-				Model->scale(vec3(100.0, 1, 100.0));
-				Model->translate(vec3(0.0, -2, 0.0));
-				SetMaterial(11, gProgPtr);
-				glUniformMatrix4fv(groundProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-				boxShape->draw(groundProg);
-				Model->popMatrix();
+				Model->translate(vec3(6, 0.f, -2));
+				glUniformMatrix4fv(groundProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
+				groundTexture->bind(groundProg->getUniform("Texture0"));
+				glUniform1f(groundProg->getUniform("texNum"), 50);
+				renderGround();
+				Model->popMatrix();	
 
 		Model->popMatrix();
-		Projection->popMatrix();
 		groundProg->unbind();
+	}
 
+	// have booleon in here for whether to draw the quad or not
+	void drawScene(MatrixStack* View, MatrixStack* Projection)
+	{
 
-
+		/* Leave this code to just draw the meshes alone */
+		// Create the matrix stacks
+		auto Model = make_shared<MatrixStack>();
+		Program *sProgPtr = shapeProg.get();
 		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~ OBJECT PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 		//Draw our scene - two meshes - right now to a texture
 		shapeProg->bind();
-		Projection->pushMatrix();
-		Program *progPtr = shapeProg.get();
-		Projection->perspective(45.0f, aspect, 0.01f, 100.0f);
 
 		glUniformMatrix4fv(shapeProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(shapeProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
@@ -381,7 +484,7 @@ public:
 				Model->translate(vec3(tx, 0.f, tz));
 				Model->rotate(3.14f + theta + sin(glfwGetTime()) + cos(glfwGetTime()), vec3(0, 1, 0));
 				// Model->rotate(radians(-90.f), vec3(1, 0, 0));
-				SetMaterial(i % 10, progPtr);
+				SetMaterial(i % 10, sProgPtr);
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 				bunnyShape->draw(shapeProg);
 				Model->popMatrix();
@@ -390,9 +493,6 @@ public:
 
 
 		Model->popMatrix();
-		Projection->popMatrix();
-		View->popMatrix();
-
 		shapeProg->unbind();
 
 	
