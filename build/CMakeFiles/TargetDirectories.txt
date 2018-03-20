@@ -1,0 +1,3 @@
+/Users/Caroline/Documents/csc471/final/Blender/build/CMakeFiles/rebuild_cache.dir
+/Users/Caroline/Documents/csc471/final/Blender/build/CMakeFiles/edit_cache.dir
+/Users/Caroline/Documents/csc471/final/Blender/build/CMakeFiles/blender.dir
