@@ -100,6 +100,7 @@ public:
 	float prevX;
 	float prevY;
 	vec3 cameraPos = vec3(0.0, 0.0, 5.0);
+	vec3 lightPos = vec3(500.0, 500.0, 500.0);
 
 	float x = PI/2;
 	float y = 0;
@@ -197,7 +198,6 @@ public:
 			prevX = 0;
 			prevY = 0;
 		}
-
 	}
 
 	void cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
@@ -220,7 +220,6 @@ public:
 			prevX = xpos;
 
 		}
-
 	}
 
 	void resizeCallback(GLFWwindow *window, int width, int height)
@@ -232,10 +231,10 @@ public:
 	void initTex(const std::string& resourceDirectory)
 	{
 		skyTexture = make_shared<Texture>();
-		skyTexture->setFilename(resourceDirectory + "/sky.jpg");
+		skyTexture->setFilename(resourceDirectory + "/nightSky.jpg");
 		skyTexture->init();
 		skyTexture->setUnit(0);
-		skyTexture->setWrapModes(GL_REPEAT, GL_REPEAT);
+		skyTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
 
 	 	groundTexture = make_shared<Texture>();
 		groundTexture->setFilename(resourceDirectory + "/ground.jpg");
@@ -247,9 +246,7 @@ public:
 		particleTexture->setFilename(resourceDirectory + "/alpha.bmp");
 		particleTexture->init();
 		particleTexture->setUnit(2);
-		particleTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
-
-		
+		particleTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);	
 	}
 
 	void groundSetUp(const std::string& resourceDirectory)
@@ -273,6 +270,7 @@ public:
 		groundProg->addAttribute("vertPos");
 		groundProg->addAttribute("vertNor");
 		groundProg->addAttribute("vertTex");
+		groundProg->addUniform("lightPos");
 	}
 
 	void shapeSetUp(const std::string& resourceDirectory)
@@ -324,8 +322,8 @@ public:
 		skyProg = make_shared<Program>();
 		skyProg->setVerbose(true);
 		skyProg->setShaderNames(
-			resourceDirectory + "/tex_vert.glsl",
-			resourceDirectory + "/tex_frag.glsl");
+			resourceDirectory + "/sky_tex_vert.glsl",
+			resourceDirectory + "/sky_tex_frag.glsl");
 		if (! skyProg->init())
 		{
 			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
@@ -336,6 +334,7 @@ public:
 		skyProg->addUniform("M");
 		skyProg->addUniform("Texture0");
 		skyProg->addUniform("texNum");
+		skyProg->addUniform("lightPos");
 		skyProg->addAttribute("vertPos");
 		skyProg->addAttribute("vertNor");
 		skyProg->addAttribute("vertTex");
@@ -380,7 +379,6 @@ public:
 			treeScales.push_back(randGen(3.0f, 7.0f));
 			treeRotations.push_back(randGen(0.0f, 180.0f));
 		}
-
 	}
 
 	void initGeom(const std::string& resourceDirectory)
@@ -452,7 +450,6 @@ public:
 		glm::vec3 pos;
 		glm::vec4 col;
 
-		// go through all the particles and update the CPU buffer
 		for (int i = 0; i < numP; i++)
 		{
 			pos = particles[i]->getPosition();
@@ -496,8 +493,6 @@ public:
 		std::sort(particles.begin(), particles.end(), sorter);
 	}
 
-
-	/**** geometry set up for ground plane *****/
 	void initQuad()
 	{
 		float g_groundSize = 512;
@@ -551,7 +546,6 @@ public:
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, GIndxBuffObj);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
 	}
-
 
 	void render()
 	{
@@ -630,8 +624,7 @@ public:
 
 		Projection->popMatrix();
 		ViewUser->popMatrix();
-		ViewUser->popMatrix();
-		 
+		ViewUser->popMatrix();	 
 	}
 
 	void drawParticles(MatrixStack* View, MatrixStack* Projection)
@@ -671,8 +664,6 @@ public:
 		particleProg->unbind();
 	}
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GROUND PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 	void renderGround()
 	{
 
@@ -697,11 +688,13 @@ public:
 	}
 
 	void drawGround(MatrixStack* View, MatrixStack* Projection)
-	{		
+	{
 		auto Model = make_shared<MatrixStack>();
 		groundProg->bind();
 		glUniformMatrix4fv(groundProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(groundProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
+		glUniform3f(groundProg->getUniform("lightPos"), 500.0, 500.0, 500.0);
+
 		Model->pushMatrix();
 			Model->loadIdentity();
 				Model->pushMatrix();
@@ -716,11 +709,12 @@ public:
 	}
 
 	void drawSky(MatrixStack* View, MatrixStack* Projection)
-	{		
+	{
 		auto Model = make_shared<MatrixStack>();
 		skyProg->bind();
 		glUniformMatrix4fv(skyProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(skyProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
+		glUniform3f(skyProg->getUniform("lightPos"), 500.0, 500.0, 500.0);
 		Model->pushMatrix();
 			Model->loadIdentity();
 				Model->pushMatrix();
@@ -728,7 +722,7 @@ public:
 				Model->scale(vec3(50, 50.f, 50));
 				glUniformMatrix4fv(skyProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				skyTexture->bind(skyProg->getUniform("Texture0"));
-				glUniform1f(skyProg->getUniform("texNum"), 1);
+				glUniform1f(skyProg->getUniform("texNum"), 500);
 				sphereShape->draw(skyProg);
 				Model->popMatrix();	
 
@@ -747,7 +741,7 @@ public:
 
 		glUniformMatrix4fv(shapeProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(shapeProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
-		glUniform3f(shapeProg->getUniform("lightPos"), 0.0, 2.0, 0.0);
+		glUniform3f(shapeProg->getUniform("lightPos"), 500.0, 500.0, 500.0);
 
 		Model->pushMatrix();
 			Model->loadIdentity();
@@ -771,8 +765,6 @@ public:
 
 		Model->popMatrix();
 		shapeProg->unbind();
-
-	
 	}
 
 	// helper function to set materials for shading
@@ -856,7 +848,6 @@ public:
 	        break;
 		}
 	}
-
 
 	float randGen(float l, float h)
 	{

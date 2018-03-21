@@ -9,12 +9,14 @@ uniform mat4 V;
 uniform float texNum;
 uniform vec3 lightPos;
 
+
 out float dCo;
 out vec2 vTexCoord;
 out vec3 fragNor;
 
 void main() {
 
+  vec3 lightDir = vec3(1, 1, 1);
   vec4 vPosition;
 
   /* First model transforms */
