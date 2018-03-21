@@ -702,7 +702,8 @@ public:
 		Model->pushMatrix();
 			Model->loadIdentity();
 				Model->pushMatrix();
-				Model->scale(vec3(50, 50.f, 50));
+				Model->translate(cameraPos);
+				Model->scale(vec3(25, 25.f, 25));
 				glUniformMatrix4fv(skyProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				skyTexture->bind(skyProg->getUniform("Texture0"));
 				glUniform1f(skyProg->getUniform("texNum"), 1);
