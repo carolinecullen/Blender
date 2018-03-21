@@ -89,6 +89,7 @@ public:
 
 
 	bool FirstTime = true;
+	bool sprint = false;
 	bool Moving = false;
 	int gMat = 0;
 
@@ -159,6 +160,16 @@ public:
 			moveBackward = false;
 
 		}
+		else if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_PRESS)
+		{
+			sprint = true;
+
+		}
+		else if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_RELEASE)
+		{
+			sprint = false;
+
+		}
 	}
 
 	void scrollCallback(GLFWwindow* window, double deltaX, double deltaY)
@@ -220,23 +231,25 @@ public:
 	// Code to load in textures
 	void initTex(const std::string& resourceDirectory)
 	{
+		skyTexture = make_shared<Texture>();
+		skyTexture->setFilename(resourceDirectory + "/sky.jpg");
+		skyTexture->init();
+		skyTexture->setUnit(0);
+		skyTexture->setWrapModes(GL_REPEAT, GL_REPEAT);
+
 	 	groundTexture = make_shared<Texture>();
 		groundTexture->setFilename(resourceDirectory + "/ground.jpg");
 		groundTexture->init();
-		groundTexture->setUnit(0);
+		groundTexture->setUnit(1);
 		groundTexture->setWrapModes(GL_REPEAT, GL_REPEAT);
 
 		particleTexture = make_shared<Texture>();
 		particleTexture->setFilename(resourceDirectory + "/alpha.bmp");
 		particleTexture->init();
-		particleTexture->setUnit(1);
+		particleTexture->setUnit(2);
 		particleTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
 
-		skyTexture = make_shared<Texture>();
-		skyTexture->setFilename(resourceDirectory + "/nightSky.jpg");
-		skyTexture->init();
-		skyTexture->setUnit(2);
-		skyTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+		
 	}
 
 	void groundSetUp(const std::string& resourceDirectory)
@@ -336,19 +349,12 @@ public:
 		glClearColor(.12f, .34f, .56f, 1.0f);
 		glEnable(GL_DEPTH_TEST);
 
-		shapeSetUp(resourceDirectory);
-
-		groundSetUp(resourceDirectory);
-
-		CHECKED_GL_CALL(glEnable(GL_DEPTH_TEST));
-		CHECKED_GL_CALL(glEnable(GL_BLEND));
-		CHECKED_GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-		CHECKED_GL_CALL(glPointSize(20.0f));
-
-		particleSetUp(resourceDirectory);
-
+		
 		skySetUp(resourceDirectory);
-
+		shapeSetUp(resourceDirectory);
+		groundSetUp(resourceDirectory);
+		particleSetUp(resourceDirectory);
+		
 	 }
 
 	void initParticles()
@@ -369,9 +375,8 @@ public:
 		
 		for(int i = 0; i < numTrees; i++)
 		{
-			treePositions.push_back(randGen(-256.f, 256.f));
-			treePositions.push_back(randGen(-256.f, 256.f));
-
+			treePositions.push_back(randGen(-512.f, 512.f));
+			treePositions.push_back(randGen(-512.f, 512.f));
 			treeScales.push_back(randGen(3.0f, 7.0f));
 			treeRotations.push_back(randGen(0.0f, 180.0f));
 		}
@@ -419,10 +424,8 @@ public:
 		bean->resize();
 		bean->init();
 
-
 		// for ground
 		initQuad();
-
 
 		// creation for particles
 		CHECKED_GL_CALL(glGenVertexArrays(1, &ParticleVertexArrayID));
@@ -568,21 +571,34 @@ public:
 		vec3 up = vec3(0,1,0);
 		vec3 sides = cross(forward, up);
 
+		float actualSpeed = MOVEMENT_SPEED;
+		if(sprint)
+		{
+			actualSpeed *= 2;
+		}
+
 		if(moveForward)
 		{
-			cameraPos += forward * MOVEMENT_SPEED;
+			cameraPos += forward * actualSpeed;
+
 		}
 		if(moveBackward)
 		{
-			cameraPos -= forward * MOVEMENT_SPEED;
+
+			cameraPos -= forward * actualSpeed;
+
 		}
 		if(moveLeft)
 		{
-			cameraPos -= sides * MOVEMENT_SPEED;
+
+			cameraPos -= sides * actualSpeed;
+
 		}
 		if(moveRight)
 		{
-			cameraPos += sides * MOVEMENT_SPEED;
+
+			cameraPos += sides * actualSpeed;
+
 		}
 
 		auto ViewUser = make_shared<MatrixStack>();
@@ -591,20 +607,26 @@ public:
 			ViewUser->loadIdentity();
 			ViewUser->pushMatrix();
 			ViewUser->lookAt(vec3(cameraPos.x, 1.0, cameraPos.z), forward + vec3(cameraPos.x, 1.0, cameraPos.z), up);
-
 		MatrixStack *userViewPtr = ViewUser.get();
 
 		auto Projection = make_shared<MatrixStack>();
-
 		Projection->pushMatrix();
 		Projection->perspective(45.0f, aspect, 0.01f, 100.0f);
-
 		MatrixStack *projectionPtr = Projection.get();
-		
+
+
+		CHECKED_GL_CALL(glDisable(GL_DEPTH_TEST));
+		CHECKED_GL_CALL(glDisable(GL_BLEND));
+		drawSky(userViewPtr, projectionPtr);
+
+		CHECKED_GL_CALL(glEnable(GL_DEPTH_TEST));
 		drawScene(userViewPtr, projectionPtr);
 		drawGround(userViewPtr, projectionPtr);
+
+		CHECKED_GL_CALL(glEnable(GL_BLEND));
+		CHECKED_GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+		CHECKED_GL_CALL(glPointSize(25.0f));
 		drawParticles(userViewPtr, projectionPtr);
-		drawSky(userViewPtr, projectionPtr);
 
 		Projection->popMatrix();
 		ViewUser->popMatrix();
@@ -703,7 +725,7 @@ public:
 			Model->loadIdentity();
 				Model->pushMatrix();
 				Model->translate(cameraPos);
-				Model->scale(vec3(25, 25.f, 25));
+				Model->scale(vec3(50, 50.f, 50));
 				glUniformMatrix4fv(skyProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				skyTexture->bind(skyProg->getUniform("Texture0"));
 				glUniform1f(skyProg->getUniform("texNum"), 1);
@@ -725,7 +747,7 @@ public:
 
 		glUniformMatrix4fv(shapeProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(shapeProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
-		glUniform3f(shapeProg->getUniform("lightPos"), -500.0, 500.0, 500.0);
+		glUniform3f(shapeProg->getUniform("lightPos"), 0.0, 2.0, 0.0);
 
 		Model->pushMatrix();
 			Model->loadIdentity();
@@ -741,9 +763,7 @@ public:
 				Model->rotate(treeR, vec3(0, 1, 0));
 				SetMaterial(i % 10, sProgPtr);
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-
 				fallTree->draw(shapeProg);
-
 				Model->popMatrix();
 				
 			}
