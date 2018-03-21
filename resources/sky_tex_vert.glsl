@@ -9,7 +9,6 @@ uniform mat4 V;
 uniform float texNum;
 uniform vec3 lightPos;
 
-
 out float dCo;
 out vec2 vTexCoord;
 out vec3 fragNor;

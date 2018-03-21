@@ -231,7 +231,7 @@ public:
 	void initTex(const std::string& resourceDirectory)
 	{
 		skyTexture = make_shared<Texture>();
-		skyTexture->setFilename(resourceDirectory + "/nightSky.jpg");
+		skyTexture->setFilename(resourceDirectory + "/sky.jpg");
 		skyTexture->init();
 		skyTexture->setUnit(0);
 		skyTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
@@ -659,6 +659,7 @@ public:
 		CHECKED_GL_CALL(glVertexAttribDivisor(1, 0));
 		CHECKED_GL_CALL(glDisableVertexAttribArray(0));
 		CHECKED_GL_CALL(glDisableVertexAttribArray(1));
+		particleTexture->unbind();
 
 		Model->popMatrix();
 		particleProg->unbind();
@@ -703,6 +704,8 @@ public:
 				glUniform1f(groundProg->getUniform("texNum"), 500);
 				renderGround();
 				Model->popMatrix();	
+				groundTexture->unbind();
+
 
 		Model->popMatrix();
 		groundProg->unbind();
@@ -722,9 +725,11 @@ public:
 				Model->scale(vec3(50, 50.f, 50));
 				glUniformMatrix4fv(skyProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				skyTexture->bind(skyProg->getUniform("Texture0"));
-				glUniform1f(skyProg->getUniform("texNum"), 500);
+				glUniform1f(skyProg->getUniform("texNum"), 1);
 				sphereShape->draw(skyProg);
 				Model->popMatrix();	
+				skyTexture->unbind();
+
 
 		Model->popMatrix();
 		skyProg->unbind();
@@ -767,7 +772,6 @@ public:
 		shapeProg->unbind();
 	}
 
-	// helper function to set materials for shading
 	void SetMaterial(int i, Program *prog)
 	{
 		switch (i)
@@ -869,16 +873,10 @@ int main(int argc, char **argv)
 
 	Application *application = new Application();
 
-	// Your main will always include a similar set up to establish your window
-	// and GL context, etc.
-
 	WindowManager *windowManager = new WindowManager();
 	windowManager->init(512, 512);
 	windowManager->setEventCallbacks(application);
 	application->windowManager = windowManager;
-
-	// This is the code that will likely change program to program as you
-	// may need to initialize or set up different data and state
 
 	application->init(resourceDir);
 	application->initTex(resourceDir);
@@ -894,6 +892,7 @@ int main(int argc, char **argv)
 
 			// Swap front and back buffers.
 			glfwSwapBuffers(windowManager->getHandle());
+
 			// Poll for and process events.
 			glfwPollEvents();
 	}
