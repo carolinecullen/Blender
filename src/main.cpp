@@ -50,6 +50,7 @@ public:
 	shared_ptr<Shape> boxShape;
 	shared_ptr<Shape> bunnyShape;
 	shared_ptr<Shape> bushShape;
+	shared_ptr<Shape> Blender;
 
 	// Contains vertex information for OpenGL
 	GLuint GroundVertexArrayID;
@@ -65,9 +66,9 @@ public:
 	vector<std::shared_ptr<Particle>> particles;
 	shared_ptr<Texture> particleTexture;
 	GLuint ParticleVertexArrayID;
-	int numP = 300;
-	GLfloat points[900];
-	GLfloat pointColors[1200];
+	int numP = 600;
+	GLfloat points[1800];
+	GLfloat pointColors[2400];
 	GLuint particlePointsBuffer;
 	GLuint particleColorBuffer;
 	float t0_disp = 0.0f;
@@ -292,14 +293,10 @@ public:
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 		GLSL::checkVersion();
 
-		// Set background color.
 		glClearColor(.12f, .34f, .56f, 1.0f);
-		// Enable z-buffer test.
 		glEnable(GL_DEPTH_TEST);
 
 		shapeSetUp(resourceDirectory);
-
-		// initTex(resourceDirectory);
 
 		groundSetUp(resourceDirectory);
 
@@ -418,7 +415,7 @@ public:
 	/**** geometry set up for ground plane *****/
 	void initQuad()
 	{
-		float g_groundSize = 20;
+		float g_groundSize = 512;
 		float g_groundY = -1.5;
 
 		// A x-z plane at y = g_groundY of dim[-g_groundSize, g_groundSize]^2
