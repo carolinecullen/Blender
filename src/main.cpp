@@ -59,6 +59,7 @@ public:
 	shared_ptr<Shape> Blender;
 	shared_ptr<Shape> fallTree;
 	shared_ptr<Shape> deadTree;
+	shared_ptr<Shape> bean;
 
 
 	// Contains vertex information for OpenGL
@@ -82,7 +83,7 @@ public:
 	float t0_disp = 0.0f;
 	float t_disp = 0.0f;
 	bool keyToggles[256] = { false };
-	float t = 0.0f; //reset in init
+	float t = 0.0f;
 	float h = 0.01f;
 	glm::vec3 g = glm::vec3(0.0f, -0.01f, 0.0f);
 
@@ -106,6 +107,11 @@ public:
 	bool moveRight = false;
 	bool moveForward = false;
 	bool moveBackward = false;
+
+	int numTrees;
+	vector<GLfloat> treePositions;
+	vector<GLfloat> treeScales;
+	vector<GLfloat> treeRotations;
 
 	void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 	{
@@ -212,7 +218,6 @@ public:
 	}
 
 	// Code to load in textures
-
 	void initTex(const std::string& resourceDirectory)
 	{
 	 	groundTexture = make_shared<Texture>();
@@ -338,7 +343,7 @@ public:
 		CHECKED_GL_CALL(glEnable(GL_DEPTH_TEST));
 		CHECKED_GL_CALL(glEnable(GL_BLEND));
 		CHECKED_GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-		CHECKED_GL_CALL(glPointSize(14.0f));
+		CHECKED_GL_CALL(glPointSize(20.0f));
 
 		particleSetUp(resourceDirectory);
 
@@ -356,6 +361,21 @@ public:
 			particles.push_back(particle);
 			particle->load();
 		}
+	}
+
+	void initTrees()
+	{
+		numTrees = randGen(300.f, 500.f);
+		
+		for(int i = 0; i < numTrees; i++)
+		{
+			treePositions.push_back(randGen(-256.f, 256.f));
+			treePositions.push_back(randGen(-256.f, 256.f));
+
+			treeScales.push_back(randGen(3.0f, 7.0f));
+			treeRotations.push_back(randGen(0.0f, 180.0f));
+		}
+
 	}
 
 	void initGeom(const std::string& resourceDirectory)
@@ -393,6 +413,11 @@ public:
 		deadTree->loadMesh(resourceDirectory + "/deadTree.obj");
 		deadTree->resize();
 		deadTree->init();
+
+		bean = make_shared<Shape>();
+		bean->loadMesh(resourceDirectory + "/beanstalk.obj");
+		bean->resize();
+		bean->init();
 
 
 		// for ground
@@ -579,7 +604,7 @@ public:
 		drawScene(userViewPtr, projectionPtr);
 		drawGround(userViewPtr, projectionPtr);
 		drawParticles(userViewPtr, projectionPtr);
-		// drawSky(userViewPtr, projectionPtr);
+		drawSky(userViewPtr, projectionPtr);
 
 		Projection->popMatrix();
 		ViewUser->popMatrix();
@@ -704,21 +729,22 @@ public:
 		Model->pushMatrix();
 			Model->loadIdentity();
  
-			float tx, tz, theta = 0;
-			for (int i = 0; i < 10; i++)
+			for (int i = 0; i < numTrees; i+=3)
 			{
-				tx = (8.f) * sin(theta + glfwGetTime()/2);
-				tz = (8.f) * cos(theta + glfwGetTime()/2);
 				/* draw left mesh */
+				GLfloat treeS = treeScales[i/3];
+				GLfloat treeR = treeRotations[i/3];
 				Model->pushMatrix();
-				Model->translate(vec3(tx, 0.f, tz));
-				Model->rotate(3.14f + theta + sin(glfwGetTime()) + cos(glfwGetTime()), vec3(0, 1, 0));
-				// Model->rotate(radians(-90.f), vec3(1, 0, 0));
+				Model->translate(vec3(treePositions[i], treeS/1.60, treePositions[i+2]));
+				Model->scale(vec3(treeS));
+				Model->rotate(treeR, vec3(0, 1, 0));
 				SetMaterial(i % 10, sProgPtr);
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+
 				fallTree->draw(shapeProg);
+
 				Model->popMatrix();
-				theta += 6.28f / 10.f;
+				
 			}
 
 
@@ -810,6 +836,13 @@ public:
 		}
 	}
 
+
+	float randGen(float l, float h)
+	{
+		float r = rand() / (float) RAND_MAX;
+		return (1.0f - r) * l + r * h;
+	}
+
 };
 
 int main(int argc, char **argv)
@@ -838,6 +871,7 @@ int main(int argc, char **argv)
 	application->init(resourceDir);
 	application->initTex(resourceDir);
 	application->initParticles();
+	application->initTrees();
 	application->initGeom(resourceDir);
 
 	// Loop until the user closes the window.
