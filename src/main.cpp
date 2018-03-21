@@ -31,14 +31,20 @@ public:
 
 	WindowManager * windowManager = nullptr;
 	int width, height;
-	// Our shader program
+	// programs
 	shared_ptr<Program> shapeProg;
 	shared_ptr<Program> groundProg;
 	shared_ptr<Program> particleProg;
+	shared_ptr<Program> skyProg;
+
+	// textures 
+
+	shared_ptr<Texture> skyTexture;
+	shared_ptr<Texture> groundTexture;
+	shared_ptr<Texture> particleTexture;
 
 	//ground info
 	GLuint GrndBuffObj, GrndNorBuffObj, GrndTexBuffObj, GIndxBuffObj;
-	shared_ptr<Texture> groundTexture;
 	int gGiboLen;
 
 	//transforms for the world
@@ -51,6 +57,9 @@ public:
 	shared_ptr<Shape> bunnyShape;
 	shared_ptr<Shape> bushShape;
 	shared_ptr<Shape> Blender;
+	shared_ptr<Shape> fallTree;
+	shared_ptr<Shape> deadTree;
+
 
 	// Contains vertex information for OpenGL
 	GLuint GroundVertexArrayID;
@@ -64,7 +73,6 @@ public:
 
 	//stuff necessary for particles
 	vector<std::shared_ptr<Particle>> particles;
-	shared_ptr<Texture> particleTexture;
 	GLuint ParticleVertexArrayID;
 	int numP = 600;
 	GLfloat points[1800];
@@ -160,7 +168,6 @@ public:
 		{
 			mouseDown = true;
 			glfwGetCursorPos(window, &posX, &posY);
-			cout << "Pos X " << posX << " Pos Y " << posY << endl;
 			Moving = true;
 			prevX = posX;
 			prevY = posY;
@@ -209,7 +216,7 @@ public:
 	void initTex(const std::string& resourceDirectory)
 	{
 	 	groundTexture = make_shared<Texture>();
-		groundTexture->setFilename(resourceDirectory + "/grass.jpg");
+		groundTexture->setFilename(resourceDirectory + "/ground.jpg");
 		groundTexture->init();
 		groundTexture->setUnit(0);
 		groundTexture->setWrapModes(GL_REPEAT, GL_REPEAT);
@@ -219,6 +226,12 @@ public:
 		particleTexture->init();
 		particleTexture->setUnit(1);
 		particleTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+
+		skyTexture = make_shared<Texture>();
+		skyTexture->setFilename(resourceDirectory + "/nightSky.jpg");
+		skyTexture->init();
+		skyTexture->setUnit(2);
+		skyTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
 	}
 
 	void groundSetUp(const std::string& resourceDirectory)
@@ -288,6 +301,28 @@ public:
 		particleProg->addAttribute("vertPos");
 	}
 
+	void skySetUp(const std::string& resourceDirectory)
+	{
+		skyProg = make_shared<Program>();
+		skyProg->setVerbose(true);
+		skyProg->setShaderNames(
+			resourceDirectory + "/tex_vert.glsl",
+			resourceDirectory + "/tex_frag.glsl");
+		if (! skyProg->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		skyProg->addUniform("P");
+		skyProg->addUniform("V");
+		skyProg->addUniform("M");
+		skyProg->addUniform("Texture0");
+		skyProg->addUniform("texNum");
+		skyProg->addAttribute("vertPos");
+		skyProg->addAttribute("vertNor");
+		skyProg->addAttribute("vertTex");
+	}
+
 	void init(const std::string& resourceDirectory)
 	{
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
@@ -307,6 +342,8 @@ public:
 
 		particleSetUp(resourceDirectory);
 
+		skySetUp(resourceDirectory);
+
 	 }
 
 	void initParticles()
@@ -324,11 +361,6 @@ public:
 	void initGeom(const std::string& resourceDirectory)
 	{
 
-		sphereShape = make_shared<Shape>();
-		sphereShape->loadMesh(resourceDirectory + "/sphere.obj");
-		sphereShape->resize();
-		sphereShape->init();
-
 		boxShape = make_shared<Shape>();
 		boxShape->loadMesh(resourceDirectory + "/cube.obj");
 		boxShape->resize();
@@ -344,22 +376,47 @@ public:
 		bushShape->resize();
 		bushShape->init();
 
+
+		// need to make it so i can read i multiple shapes like the dummy 
+		// also new shader that doesnt expect the vertTex attribute
+		Blender = make_shared<Shape>();
+		Blender->loadMesh(resourceDirectory + "/blender.obj");
+		Blender->resize();
+		Blender->init();
+
+		fallTree = make_shared<Shape>();
+		fallTree->loadMesh(resourceDirectory + "/fallTree.obj");
+		fallTree->resize();
+		fallTree->init();
+
+		deadTree = make_shared<Shape>();
+		deadTree->loadMesh(resourceDirectory + "/deadTree.obj");
+		deadTree->resize();
+		deadTree->init();
+
+
+		// for ground
 		initQuad();
 
+
+		// creation for particles
 		CHECKED_GL_CALL(glGenVertexArrays(1, &ParticleVertexArrayID));
 		CHECKED_GL_CALL(glBindVertexArray(ParticleVertexArrayID));
-		// generate vertex buffer to hand off to OGL - using instancing
-		CHECKED_GL_CALL(glGenBuffers(1, &particlePointsBuffer));
-		// set the current state to focus on our vertex buffer
-		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, particlePointsBuffer));
-		// actually memcopy the data - only do this once
-		CHECKED_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(points), NULL, GL_STREAM_DRAW));
 
+		CHECKED_GL_CALL(glGenBuffers(1, &particlePointsBuffer));
+		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, particlePointsBuffer));
+
+		CHECKED_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(points), NULL, GL_STREAM_DRAW));
 		CHECKED_GL_CALL(glGenBuffers(1, &particleColorBuffer));
-		// set the current state to focus on our vertex buffer
+		
 		CHECKED_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, particleColorBuffer));
-		// actually memcopy the data - only do this once
 		CHECKED_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(pointColors), NULL, GL_STREAM_DRAW));
+		// creation for particles
+
+		sphereShape = make_shared<Shape>();
+		sphereShape->loadMesh(resourceDirectory + "/sphere.obj");
+		sphereShape->resize();
+		sphereShape->init();
 	}
 
 	void updateGeom()
@@ -522,6 +579,7 @@ public:
 		drawScene(userViewPtr, projectionPtr);
 		drawGround(userViewPtr, projectionPtr);
 		drawParticles(userViewPtr, projectionPtr);
+		// drawSky(userViewPtr, projectionPtr);
 
 		Projection->popMatrix();
 		ViewUser->popMatrix();
@@ -594,18 +652,15 @@ public:
 	void drawGround(MatrixStack* View, MatrixStack* Projection)
 	{		
 		auto Model = make_shared<MatrixStack>();
-		// glBindFramebuffer(GL_FRAMEBUFFER, 1);
 		groundProg->bind();
 		glUniformMatrix4fv(groundProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(groundProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
-		// globl transforms for 'camera' (you will fix this now!)
 		Model->pushMatrix();
 			Model->loadIdentity();
 				Model->pushMatrix();
-				Model->translate(vec3(6, 0.f, -2));
 				glUniformMatrix4fv(groundProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				groundTexture->bind(groundProg->getUniform("Texture0"));
-				glUniform1f(groundProg->getUniform("texNum"), 50);
+				glUniform1f(groundProg->getUniform("texNum"), 500);
 				renderGround();
 				Model->popMatrix();	
 
@@ -613,23 +668,39 @@ public:
 		groundProg->unbind();
 	}
 
-	// have booleon in here for whether to draw the quad or not
+	void drawSky(MatrixStack* View, MatrixStack* Projection)
+	{		
+		auto Model = make_shared<MatrixStack>();
+		skyProg->bind();
+		glUniformMatrix4fv(skyProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
+		glUniformMatrix4fv(skyProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
+		Model->pushMatrix();
+			Model->loadIdentity();
+				Model->pushMatrix();
+				Model->scale(vec3(50, 50.f, 50));
+				glUniformMatrix4fv(skyProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
+				skyTexture->bind(skyProg->getUniform("Texture0"));
+				glUniform1f(skyProg->getUniform("texNum"), 1);
+				sphereShape->draw(skyProg);
+				Model->popMatrix();	
+
+		Model->popMatrix();
+		skyProg->unbind();
+	}
+
 	void drawScene(MatrixStack* View, MatrixStack* Projection)
 	{
 
-		/* Leave this code to just draw the meshes alone */
-		// Create the matrix stacks
 		auto Model = make_shared<MatrixStack>();
 		Program *sProgPtr = shapeProg.get();
 
 		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~ OBJECT PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-		//Draw our scene - two meshes - right now to a texture
 		shapeProg->bind();
 
 		glUniformMatrix4fv(shapeProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(shapeProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
 		glUniform3f(shapeProg->getUniform("lightPos"), -500.0, 500.0, 500.0);
-		// globl transforms for 'camera' (you will fix this now!)
+
 		Model->pushMatrix();
 			Model->loadIdentity();
  
@@ -645,7 +716,7 @@ public:
 				// Model->rotate(radians(-90.f), vec3(1, 0, 0));
 				SetMaterial(i % 10, sProgPtr);
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-				bunnyShape->draw(shapeProg);
+				fallTree->draw(shapeProg);
 				Model->popMatrix();
 				theta += 6.28f / 10.f;
 			}
