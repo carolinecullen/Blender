@@ -58,17 +58,17 @@ public:
 	shared_ptr<Shape> sphereShape;
 	shared_ptr<Shape> bunnyShape;
 	shared_ptr<Shape> bushShape;
-	shared_ptr<Shape> Blender;
 	shared_ptr<Shape> fallTree;
 	shared_ptr<Shape> deadTree;
 	shared_ptr<Shape> bean;
 	shared_ptr<Shape> lime;
-	shared_ptr<Shape> lemon;
 	shared_ptr<Shape> strawberries;
 	shared_ptr<Shape> blueberries;
 	shared_ptr<Shape> banana;
 	shared_ptr<Shape> orange;
 
+	vector<shared_ptr<Shape>> blenderShapes;
+	vector<shared_ptr<Shape>> lemonShapes;
 
 	// Contains vertex information for OpenGL
 	GLuint GroundVertexArrayID;
@@ -483,6 +483,80 @@ public:
 		}
 	}
 
+	void uploadMultipleShapes(const std::string& resourceDirectory, string inStr, int switchNum)
+	{
+	
+		vector<tinyobj::shape_t> TOshapes;
+		vector<tinyobj::material_t> objMaterials;
+		string errStr;
+		bool rc = tinyobj::LoadObj(TOshapes, objMaterials, errStr,
+						(resourceDirectory + inStr).c_str());
+
+		if (!rc)
+		{
+			cerr << errStr << endl;
+		}
+		else
+		{
+			vec3 Gmin, Gmax;
+			Gmin = vec3(std::numeric_limits<float>::max());
+			Gmax = vec3(-std::numeric_limits<float>::max());
+			for (size_t i = 0; i < TOshapes.size(); i++)
+			{
+				shared_ptr<Shape> s =  make_shared<Shape>();
+				s->createShape(TOshapes[i]);
+				s->measure();
+
+				if(s->min.x < Gmin.x)
+				{
+					Gmin.x = s->min.x;
+				}
+
+				if(s->max.x > Gmax.x)
+				{
+					Gmax.x = s->max.x;
+				}
+
+				if(s->min.y < Gmin.y)
+				{
+					Gmin.y = s->min.y;
+				}
+
+				if(s->max.y > Gmax.y)
+				{
+					Gmax.y = s->max.y;
+				}
+
+				if(s->min.z < Gmin.z)
+				{
+					Gmin.z = s->min.z;
+				}
+
+				if(s->max.z > Gmax.z)
+				{
+					Gmax.z = s->max.z;
+				}
+
+				s->init();
+
+				switch (switchNum)
+				{
+					case 0:
+						blenderShapes.push_back(s);
+						break;
+
+					case 1:
+						lemonShapes.push_back(s);
+						break;
+
+				}
+				
+			}
+
+		}
+
+	}
+
 	void initGeom(const std::string& resourceDirectory)
 	{
 
@@ -492,13 +566,7 @@ public:
 		bushShape->resize();
 		bushShape->init();
 
-
-		// need to make it so i can read i multiple shapes like the dummy 
-		// also new shader that doesnt expect the vertTex attribute
-		Blender = make_shared<Shape>();
-		Blender->loadMesh(resourceDirectory + "/blender.obj");
-		Blender->resize();
-		Blender->init();
+		uploadMultipleShapes(resourceDirectory, "blender.obj", 0);
 
 		fallTree = make_shared<Shape>();
 		fallTree->loadMesh(resourceDirectory + "/fallTree.obj");
@@ -535,10 +603,7 @@ public:
 		lime->resize();
 		lime->init();
 
-		lemon = make_shared<Shape>();
-		lemon->loadMesh(resourceDirectory + "/fruits/lemon.obj");
-		lemon->resize();
-		lemon->init();
+		uploadMultipleShapes(resourceDirectory,"/fruits/lemon.obj", 1);
 
 		orange = make_shared<Shape>();
 		orange->loadMesh(resourceDirectory + "/fruits/orange.obj");
@@ -942,43 +1007,69 @@ public:
 				
 			}
 
+			for (size_t i = 0; i < blenderShapes.size(); i++)
+			{
+				Model->pushMatrix();
+				
+				
+				// Model->translate(-2.0f*dummyTrans);
+				Model->translate(vec3(0.0f, 0.0f, 10.0f));
+				Model->scale(vec3(10.f,10.f,10.f));
+				// Model->rotate(radians(-90.f), vec3(1,0,0));
+				// Model->rotate(radians(-90.f), vec3(0,0,1));
+
+				SetMaterial(1, sProgPtr);
+				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+				blenderShapes[i]->draw(shapeProg);
+				Model->popMatrix();
+			}
+
 			Model->pushMatrix();
-			Model->translate(vec3(blueberriesPos[0], 0.f, blueberriesPos[1]));
+			Model->translate(vec3(0.0, 0.f, 0.0));
 			SetMaterial(10, sProgPtr);
 			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 			blueberries->draw(shapeProg);
 			Model->popMatrix();
 
 			Model->pushMatrix();
-			Model->translate(vec3(bananaPos[0], 0.f, bananaPos[1]));
+			Model->translate(vec3(5.0, 0.f, 0.0));
 			SetMaterial(15, sProgPtr);
 			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 			banana->draw(shapeProg);
 			Model->popMatrix();
 
 			Model->pushMatrix();
-			Model->translate(vec3(limePos[0], 0.f, limePos[1]));
+			Model->translate(vec3(-5.0, 0.f, 0.0));
 			SetMaterial(13, sProgPtr);
 			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 			lime->draw(shapeProg);
 			Model->popMatrix();
 
-			Model->pushMatrix();
-			Model->translate(vec3(lemonPos[0], 0.f, lemonPos[1]));
-			SetMaterial(11, sProgPtr);
-			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-			lemon->draw(shapeProg);
-			Model->popMatrix();
+			for (size_t i = 0; i < lemonShapes.size(); i++)
+			{
+				Model->pushMatrix();
+				
+				// Model->scale(dummyScale);
+				// Model->translate(-2.0f*dummyTrans);
+				Model->translate(vec3(10.0f, 0.0f, 0.0f));
+				// Model->rotate(radians(-90.f), vec3(1,0,0));
+				// Model->rotate(radians(-90.f), vec3(0,0,1));
+
+				SetMaterial(1, sProgPtr);
+				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+				lemonShapes[i]->draw(shapeProg);
+				Model->popMatrix();
+			}
 
 			Model->pushMatrix();
-			Model->translate(vec3(orangePos[0], 0.f, orangePos[1]));
+			Model->translate(vec3(-10.0, 0.f, 0.0));
 			SetMaterial(12, sProgPtr);
 			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 			orange->draw(shapeProg);
 			Model->popMatrix();
 
 			Model->pushMatrix();
-			Model->translate(vec3(strawberriesPos[0], 0.f, strawberriesPos[1]));
+			Model->translate(vec3(15.0, 0.f, 0.0));
 			SetMaterial(14, sProgPtr);
 			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 			strawberries->draw(shapeProg);
@@ -1055,45 +1146,45 @@ public:
 	        break;
 
 	    case 10: // blueberries
-	        glUniform3f(prog->getUniform("MatAmb"),  0.0215f, 0.1745f, 0.0215f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.07568f, 0.61424f, 0.07568f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.633f, 0.727811f, 0.633f);
-	        glUniform1f(prog->getUniform("shine"), 30.8f);
+	        glUniform3f(prog->getUniform("MatAmb"),  0.105882f, 0.058824f, 0.113725f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.427451f, 0.470588f, 0.541176f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.333333f, 0.333333f, 0.521569f);
+	        glUniform1f(prog->getUniform("shine"), 9.84615f);
 	        break;
 
 	    case 11: // lemon
-	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
-	        glUniform1f(prog->getUniform("shine"), 1.0f);
+	        glUniform3f(prog->getUniform("MatAmb"),  0.05f,0.05f,0.0f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.5f,0.5f,0.4f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.7f,0.7f,0.04f);
+	        glUniform1f(prog->getUniform("shine"), 10.0f);
 	        break;
 
 	    case 12: // orange
-	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
-	        glUniform1f(prog->getUniform("shine"), 1.0f);
+	        glUniform3f(prog->getUniform("MatAmb"),  0.39125f, 0.135f, 0.0225f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.7038f, 0.27048f, 0.0828f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.256777f, 0.137622f, 0.086014f);
+	        glUniform1f(prog->getUniform("shine"), 12.8f);
 	        break;
 
 	    case 13: // lime
-	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
-	        glUniform1f(prog->getUniform("shine"), 1.0f);
+	        glUniform3f(prog->getUniform("MatAmb"),  0.0215f, 0.1745f, 0.0215f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.07568f, 0.61424f, 0.07568f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.633f, 0.727811f, 0.633f);
+	        glUniform1f(prog->getUniform("shine"), 76.8f);
 	        break;
 
 	    case 14: // strawberries
-	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
-	        glUniform1f(prog->getUniform("shine"), 1.0f);
+	        glUniform3f(prog->getUniform("MatAmb"),  0.1745f, 0.01175f, 0.01175f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.61424f, 0.04136f, 0.04136f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.727811f, 0.626959f, 0.626959f);
+	        glUniform1f(prog->getUniform("shine"), 76.8f);
 	        break;
 
 	    case 15: // banana
-	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
-	        glUniform1f(prog->getUniform("shine"), 1.0f);
+	        glUniform3f(prog->getUniform("MatAmb"),  0.05f,0.05f,0.0f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.5f,0.5f,0.4f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.7f,0.7f,0.04f);
+	        glUniform1f(prog->getUniform("shine"), 10.0f);
 	        break;
 
 
