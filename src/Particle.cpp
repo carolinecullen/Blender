@@ -1,6 +1,5 @@
 //
-// sueda - geometry edits Z. Wood
-// 3/16
+// Particle random generator
 //
 
 #include <iostream>
@@ -33,9 +32,9 @@ void Particle::rebirth(float t)
 	x.x = randFloat(-400.f, 400.f);
 	x.y = randFloat(0.f, 20.f);
 	x.z = randFloat(-400.f, 400.f);
-	v.x = randFloat(-1.5f, 1.5f);
-	v.y = randFloat(0.5f, 1.5f);
-	v.z = randFloat(-1.5f, 1.5f);
+	v.x = randFloat(-2.5f, 2.5f);
+	v.y = randFloat(0.5f, 5.5f);
+	v.z = randFloat(-2.5f, 2.5f);
 	lifespan = randFloat(2.f, 20.f);
 	tEnd = t + lifespan;
 

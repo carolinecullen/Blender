@@ -369,7 +369,7 @@ public:
 
 	void initTrees()
 	{
-		numTrees = randGen(300.f, 500.f);
+		numTrees = randGen(500.f, 1000.f);
 		
 		for(int i = 0; i < numTrees; i++)
 		{
@@ -619,14 +619,14 @@ public:
 		CHECKED_GL_CALL(glEnable(GL_BLEND));
 		CHECKED_GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 		CHECKED_GL_CALL(glPointSize(25.0f));
-		drawParticles(userViewPtr, projectionPtr);
+		drawParticles(userViewPtr, aspect);
 
 		Projection->popMatrix();
 		ViewUser->popMatrix();
 		ViewUser->popMatrix();	 
 	}
 
-	void drawParticles(MatrixStack* View, MatrixStack* Projection)
+	void drawParticles(MatrixStack* View, float aspect)
 	{
 		particleProg->bind();
 		updateParticles();
@@ -635,6 +635,10 @@ public:
 		auto Model = make_shared<MatrixStack>();
 		Model->pushMatrix();
 			Model->loadIdentity();
+
+		auto Projection = make_shared<MatrixStack>();
+		Projection->pushMatrix();
+		Projection->perspective(45.0f, aspect, 0.01f, 250.0f);
 
 		particleTexture->bind(particleProg->getUniform("alphaTexture"));
 		CHECKED_GL_CALL(glUniformMatrix4fv(particleProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix())));
@@ -714,13 +718,20 @@ public:
 	{
 		auto Model = make_shared<MatrixStack>();
 		skyProg->bind();
+
+		mat4 newView = View->topMatrix();
+
+		newView[3][0] = 0.0;
+		newView[3][1] = 0.0;
+		newView[3][2] = 0.0;
+
 		glUniformMatrix4fv(skyProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
-		glUniformMatrix4fv(skyProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
-		glUniform3f(skyProg->getUniform("lightPos"), 500.0, 500.0, 500.0);
+		glUniformMatrix4fv(skyProg->getUniform("V"), 1, GL_FALSE, value_ptr(newView));
+		glUniform3f(skyProg->getUniform("lightPos"), 50.0, 50.0, 50.0);
 		Model->pushMatrix();
 			Model->loadIdentity();
 				Model->pushMatrix();
-				Model->translate(cameraPos);
+				Model->rotate(cos(glfwGetTime()/10), vec3(0,1,0));
 				Model->scale(vec3(50, 50.f, 50));
 				glUniformMatrix4fv(skyProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				skyTexture->bind(skyProg->getUniform("Texture0"));
