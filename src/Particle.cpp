@@ -33,15 +33,15 @@ void Particle::rebirth(float t)
 	x.y = randFloat(0.f, 20.f);
 	x.z = randFloat(-400.f, 400.f);
 	v.x = randFloat(-2.5f, 2.5f);
-	v.y = randFloat(0.5f, 5.5f);
+	v.y = randFloat(-0.1f, 7.0f);
 	v.z = randFloat(-2.5f, 2.5f);
 	lifespan = randFloat(2.f, 20.f);
 	tEnd = t + lifespan;
 
 	scale = randFloat(0.5f, 10.0f);
-	color.r = randFloat(0.7126f, 0.9f);
-	color.g = randFloat(0.7152f, 0.8f);
-	color.b = randFloat(0.4722f, 0.5f);
+	color.r = randFloat(0.0126f, 0.9f);
+	color.g = randFloat(0.0152f, 0.8f);
+	color.b = randFloat(0.0722f, 0.9f);
 	color.a = 1.0f;
 }
 

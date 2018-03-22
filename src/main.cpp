@@ -36,12 +36,15 @@ public:
 	shared_ptr<Program> groundProg;
 	shared_ptr<Program> particleProg;
 	shared_ptr<Program> skyProg;
+	shared_ptr<Program> deadTreesProg;
 
 	// textures 
 
 	shared_ptr<Texture> skyTexture;
+	shared_ptr<Texture> sunTexture;
 	shared_ptr<Texture> groundTexture;
 	shared_ptr<Texture> particleTexture;
+	shared_ptr<Texture> deadTreeTexture;
 
 	//ground info
 	GLuint GrndBuffObj, GrndNorBuffObj, GrndTexBuffObj, GIndxBuffObj;
@@ -53,13 +56,18 @@ public:
 
 	// Shape to be used (from obj file)
 	shared_ptr<Shape> sphereShape;
-	shared_ptr<Shape> boxShape;
 	shared_ptr<Shape> bunnyShape;
 	shared_ptr<Shape> bushShape;
 	shared_ptr<Shape> Blender;
 	shared_ptr<Shape> fallTree;
 	shared_ptr<Shape> deadTree;
 	shared_ptr<Shape> bean;
+	shared_ptr<Shape> lime;
+	shared_ptr<Shape> lemon;
+	shared_ptr<Shape> strawberries;
+	shared_ptr<Shape> blueberries;
+	shared_ptr<Shape> banana;
+	shared_ptr<Shape> orange;
 
 
 	// Contains vertex information for OpenGL
@@ -100,7 +108,7 @@ public:
 	float prevX;
 	float prevY;
 	vec3 cameraPos = vec3(0.0, 0.0, 5.0);
-	vec3 lightPos = vec3(500.0, 500.0, 500.0);
+	vec3 lightPos = vec3(0, 500.0, 0);
 
 	float x = PI/2;
 	float y = 0;
@@ -114,6 +122,18 @@ public:
 	vector<GLfloat> treePositions;
 	vector<GLfloat> treeScales;
 	vector<GLfloat> treeRotations;
+
+	int numDeadTrees;
+	vector<GLfloat> deadPositions;
+	vector<GLfloat> deadScales;
+	vector<GLfloat> deadRotations;
+
+	float bananaPos[2];
+	float limePos[2];
+	float orangePos[2];
+	float strawberriesPos[2];
+	float blueberriesPos[2];
+	float lemonPos[2];
 
 	void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 	{
@@ -231,21 +251,33 @@ public:
 	void initTex(const std::string& resourceDirectory)
 	{
 		skyTexture = make_shared<Texture>();
-		skyTexture->setFilename(resourceDirectory + "/sky.jpg");
+		skyTexture->setFilename(resourceDirectory + "/crazy.jpg");
 		skyTexture->init();
 		skyTexture->setUnit(0);
 		skyTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
 
+		sunTexture = make_shared<Texture>();
+		sunTexture->setFilename(resourceDirectory + "/crazy.jpg");
+		sunTexture->init();
+		sunTexture->setUnit(1);
+		sunTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+
 	 	groundTexture = make_shared<Texture>();
 		groundTexture->setFilename(resourceDirectory + "/ground.jpg");
 		groundTexture->init();
-		groundTexture->setUnit(1);
+		groundTexture->setUnit(2);
 		groundTexture->setWrapModes(GL_REPEAT, GL_REPEAT);
+
+		deadTreeTexture = make_shared<Texture>();
+		deadTreeTexture->setFilename(resourceDirectory + "/nightSky.JPG");
+		deadTreeTexture->init();
+		deadTreeTexture->setUnit(3);
+		deadTreeTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
 
 		particleTexture = make_shared<Texture>();
 		particleTexture->setFilename(resourceDirectory + "/alpha.bmp");
 		particleTexture->init();
-		particleTexture->setUnit(2);
+		particleTexture->setUnit(4);
 		particleTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);	
 	}
 
@@ -271,6 +303,30 @@ public:
 		groundProg->addAttribute("vertNor");
 		groundProg->addAttribute("vertTex");
 		groundProg->addUniform("lightPos");
+	}
+
+	void deadTreeSetUp(const std::string& resourceDirectory)
+	{
+		//initialize the textures we might use
+		deadTreesProg = make_shared<Program>();
+		deadTreesProg->setVerbose(true);
+		deadTreesProg->setShaderNames(
+			resourceDirectory + "/tex_vert.glsl",
+			resourceDirectory + "/tex_frag.glsl");
+		if (! deadTreesProg->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		deadTreesProg->addUniform("P");
+		deadTreesProg->addUniform("V");
+		deadTreesProg->addUniform("M");
+		deadTreesProg->addUniform("Texture0");
+		deadTreesProg->addUniform("texNum");
+		deadTreesProg->addAttribute("vertPos");
+		deadTreesProg->addAttribute("vertNor");
+		deadTreesProg->addAttribute("vertTex");
+		deadTreesProg->addUniform("lightPos");
 	}
 
 	void shapeSetUp(const std::string& resourceDirectory)
@@ -333,6 +389,7 @@ public:
 		skyProg->addUniform("V");
 		skyProg->addUniform("M");
 		skyProg->addUniform("Texture0");
+		skyProg->addUniform("Texture1");
 		skyProg->addUniform("lightPos");
 		skyProg->addAttribute("vertPos");
 		skyProg->addAttribute("vertNor");
@@ -351,9 +408,9 @@ public:
 		skySetUp(resourceDirectory);
 		shapeSetUp(resourceDirectory);
 		groundSetUp(resourceDirectory);
+		deadTreeSetUp(resourceDirectory);
 		particleSetUp(resourceDirectory);
-		
-	 }
+	}
 
 	void initParticles()
 	{
@@ -369,29 +426,66 @@ public:
 
 	void initTrees()
 	{
-		numTrees = randGen(500.f, 1000.f);
+		numTrees = randGen(800.f, 1500.f);
 		
 		for(int i = 0; i < numTrees; i++)
 		{
 			treePositions.push_back(randGen(-512.f, 512.f));
 			treePositions.push_back(randGen(-512.f, 512.f));
-			treeScales.push_back(randGen(3.0f, 7.0f));
+			treeScales.push_back(randGen(5.0f, 10.0f));
 			treeRotations.push_back(randGen(0.0f, 180.0f));
+		}
+	}
+
+	void initDeadTrees()
+	{
+		numDeadTrees = randGen(500.f, 1000.f);
+		
+		for(int i = 0; i < numDeadTrees; i++)
+		{
+			deadPositions.push_back(randGen(-512.f, 512.f));
+			deadPositions.push_back(randGen(-512.f, 512.f));
+			deadScales.push_back(randGen(6.0f, 13.0f));
+			deadRotations.push_back(randGen(0.0f, 180.0f));
+		}
+	}
+
+	void initFruits()
+	{
+		for(int i = 0; i < 2; i++)
+		{
+			bananaPos[i] = randGen(-512.f, 512.f);
+		}
+
+		for(int i = 0; i < 2; i++)
+		{
+			limePos[i] = randGen(-512.f, 512.f);
+		}
+
+		for(int i = 0; i < 2; i++)
+		{
+			strawberriesPos[i] = randGen(-512.f, 512.f);
+		}
+
+		for(int i = 0; i < 2; i++)
+		{
+			lemonPos[i] = randGen(-512.f, 512.f);
+		}
+
+		for(int i = 0; i < 2; i++)
+		{
+			orangePos[i] = randGen(-512.f, 512.f);
+		}
+		
+		for(int i = 0; i < 2; i++)
+		{
+			blueberriesPos[i] = randGen(-512.f, 512.f);
 		}
 	}
 
 	void initGeom(const std::string& resourceDirectory)
 	{
 
-		boxShape = make_shared<Shape>();
-		boxShape->loadMesh(resourceDirectory + "/cube.obj");
-		boxShape->resize();
-		boxShape->init();
-
-		bunnyShape = make_shared<Shape>();
-		bunnyShape->loadMesh(resourceDirectory + "/bunny.obj");
-		bunnyShape->resize();
-		bunnyShape->init();
 
 		bushShape = make_shared<Shape>();
 		bushShape->loadMesh(resourceDirectory + "/bush.obj");
@@ -420,6 +514,36 @@ public:
 		bean->loadMesh(resourceDirectory + "/beanstalk.obj");
 		bean->resize();
 		bean->init();
+
+		banana = make_shared<Shape>();
+		banana->loadMesh(resourceDirectory + "/fruits/banana.obj");
+		banana->resize();
+		banana->init();
+
+		blueberries = make_shared<Shape>();
+		blueberries->loadMesh(resourceDirectory + "/fruits/blueberries.obj");
+		blueberries->resize();
+		blueberries->init();
+
+		strawberries = make_shared<Shape>();
+		strawberries->loadMesh(resourceDirectory + "/fruits/strawberries.obj");
+		strawberries->resize();
+		strawberries->init();
+
+		lime = make_shared<Shape>();
+		lime->loadMesh(resourceDirectory + "/fruits/lime.obj");
+		lime->resize();
+		lime->init();
+
+		lemon = make_shared<Shape>();
+		lemon->loadMesh(resourceDirectory + "/fruits/lemon.obj");
+		lemon->resize();
+		lemon->init();
+
+		orange = make_shared<Shape>();
+		orange->loadMesh(resourceDirectory + "/fruits/orange.obj");
+		orange->resize();
+		orange->init();
 
 		// for ground
 		initQuad();
@@ -554,6 +678,9 @@ public:
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		lightPos.x = cos(glfwGetTime()/12) * 500.f;
+		lightPos.z = sin(glfwGetTime()/12) * 500.f;
+
 		float aspect = width/(float)height;
 
 		x = cos(radians(phi))*cos(radians(theta));
@@ -567,11 +694,12 @@ public:
 		float actualSpeed = MOVEMENT_SPEED;
 		if(sprint)
 		{
-			actualSpeed *= 2;
+			actualSpeed *= 3;
 		}
 
 		if(moveForward)
 		{
+			// bool go = checkForCollision(cameraPos, forward, actualSpeed)
 			cameraPos += forward * actualSpeed;
 
 		}
@@ -616,6 +744,8 @@ public:
 		drawScene(userViewPtr, projectionPtr);
 		drawGround(userViewPtr, projectionPtr);
 
+		drawDeadTrees(userViewPtr, projectionPtr);
+
 		CHECKED_GL_CALL(glEnable(GL_BLEND));
 		CHECKED_GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 		CHECKED_GL_CALL(glPointSize(25.0f));
@@ -638,7 +768,7 @@ public:
 
 		auto Projection = make_shared<MatrixStack>();
 		Projection->pushMatrix();
-		Projection->perspective(45.0f, aspect, 0.01f, 250.0f);
+		Projection->perspective(45.0f, aspect, 0.01f, 150.0f);
 
 		particleTexture->bind(particleProg->getUniform("alphaTexture"));
 		CHECKED_GL_CALL(glUniformMatrix4fv(particleProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix())));
@@ -697,7 +827,7 @@ public:
 		groundProg->bind();
 		glUniformMatrix4fv(groundProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(groundProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
-		glUniform3f(groundProg->getUniform("lightPos"), 500.0, 500.0, 500.0);
+		glUniform3f(groundProg->getUniform("lightPos"), lightPos.x, lightPos.y, lightPos.z);
 
 		Model->pushMatrix();
 			Model->loadIdentity();
@@ -714,6 +844,40 @@ public:
 		groundProg->unbind();
 	}
 
+	void drawDeadTrees(MatrixStack* View, MatrixStack* Projection)
+	{
+		auto Model = make_shared<MatrixStack>();
+
+		deadTreesProg->bind();
+		glUniformMatrix4fv(deadTreesProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
+		glUniformMatrix4fv(deadTreesProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
+		glUniform3f(deadTreesProg->getUniform("lightPos"), lightPos.x, lightPos.y, lightPos.z);
+
+		Model->pushMatrix();
+			Model->loadIdentity();
+			for (int i = 0; i < numDeadTrees; i+=3)
+			{
+				/* draw left mesh */
+				GLfloat treeS = deadScales[i/3];
+				GLfloat treeR = deadRotations[i/3];
+				Model->pushMatrix();
+				Model->translate(vec3(deadPositions[i], treeS/1.60, deadPositions[i+2]));
+				Model->scale(vec3(treeS));
+				Model->rotate(treeR, vec3(0, 1, 0));
+				glUniformMatrix4fv(deadTreesProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
+				deadTreeTexture->bind(deadTreesProg->getUniform("Texture0"));
+				glUniform1f(deadTreesProg->getUniform("texNum"), 1);
+				deadTree->draw(deadTreesProg);
+				Model->popMatrix();
+				deadTreeTexture->unbind();
+			}
+				
+
+
+		Model->popMatrix();
+		deadTreesProg->unbind();
+	}
+
 	void drawSky(MatrixStack* View, MatrixStack* Projection)
 	{
 		auto Model = make_shared<MatrixStack>();
@@ -727,17 +891,19 @@ public:
 
 		glUniformMatrix4fv(skyProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(skyProg->getUniform("V"), 1, GL_FALSE, value_ptr(newView));
-		glUniform3f(skyProg->getUniform("lightPos"), 50.0, 50.0, 50.0);
+		glUniform3f(skyProg->getUniform("lightPos"), lightPos.x, lightPos.y, lightPos.z);
 		Model->pushMatrix();
 			Model->loadIdentity();
 				Model->pushMatrix();
 				Model->rotate(cos(glfwGetTime()/10), vec3(0,1,0));
-				Model->scale(vec3(50, 50.f, 50));
+				Model->scale(vec3(500, 500.f, 500));
 				glUniformMatrix4fv(skyProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				skyTexture->bind(skyProg->getUniform("Texture0"));
+				sunTexture->bind(skyProg->getUniform("Texture1"));
 				sphereShape->draw(skyProg);
 				Model->popMatrix();	
 				skyTexture->unbind();
+				sunTexture->unbind();
 
 
 		Model->popMatrix();
@@ -755,7 +921,7 @@ public:
 
 		glUniformMatrix4fv(shapeProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(shapeProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
-		glUniform3f(shapeProg->getUniform("lightPos"), 500.0, 500.0, 500.0);
+		glUniform3f(shapeProg->getUniform("lightPos"), lightPos.x, lightPos.y, lightPos.z);
 
 		Model->pushMatrix();
 			Model->loadIdentity();
@@ -775,6 +941,48 @@ public:
 				Model->popMatrix();
 				
 			}
+
+			Model->pushMatrix();
+			Model->translate(vec3(blueberriesPos[0], 0.f, blueberriesPos[1]));
+			SetMaterial(10, sProgPtr);
+			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+			blueberries->draw(shapeProg);
+			Model->popMatrix();
+
+			Model->pushMatrix();
+			Model->translate(vec3(bananaPos[0], 0.f, bananaPos[1]));
+			SetMaterial(15, sProgPtr);
+			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+			banana->draw(shapeProg);
+			Model->popMatrix();
+
+			Model->pushMatrix();
+			Model->translate(vec3(limePos[0], 0.f, limePos[1]));
+			SetMaterial(13, sProgPtr);
+			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+			lime->draw(shapeProg);
+			Model->popMatrix();
+
+			Model->pushMatrix();
+			Model->translate(vec3(lemonPos[0], 0.f, lemonPos[1]));
+			SetMaterial(11, sProgPtr);
+			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+			lemon->draw(shapeProg);
+			Model->popMatrix();
+
+			Model->pushMatrix();
+			Model->translate(vec3(orangePos[0], 0.f, orangePos[1]));
+			SetMaterial(12, sProgPtr);
+			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+			orange->draw(shapeProg);
+			Model->popMatrix();
+
+			Model->pushMatrix();
+			Model->translate(vec3(strawberriesPos[0], 0.f, strawberriesPos[1]));
+			SetMaterial(14, sProgPtr);
+			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+			strawberries->draw(shapeProg);
+			Model->popMatrix();
 
 
 		Model->popMatrix();
@@ -846,19 +1054,49 @@ public:
 	        glUniform1f(prog->getUniform("shine"), 10.0f);
 	        break;
 
-	    case 10: // bush
+	    case 10: // blueberries
 	        glUniform3f(prog->getUniform("MatAmb"),  0.0215f, 0.1745f, 0.0215f);
 	        glUniform3f(prog->getUniform("MatDif"), 0.07568f, 0.61424f, 0.07568f);
 	        glUniform3f(prog->getUniform("MatSpec"), 0.633f, 0.727811f, 0.633f);
 	        glUniform1f(prog->getUniform("shine"), 30.8f);
 	        break;
 
-	    case 11: // ground
+	    case 11: // lemon
 	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
 	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
 	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
 	        glUniform1f(prog->getUniform("shine"), 1.0f);
 	        break;
+
+	    case 12: // orange
+	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
+	        glUniform1f(prog->getUniform("shine"), 1.0f);
+	        break;
+
+	    case 13: // lime
+	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
+	        glUniform1f(prog->getUniform("shine"), 1.0f);
+	        break;
+
+	    case 14: // strawberries
+	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
+	        glUniform1f(prog->getUniform("shine"), 1.0f);
+	        break;
+
+	    case 15: // banana
+	        glUniform3f(prog->getUniform("MatAmb"),  0.09f,0.54f,0.13f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.0f,0.0f,0.0f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.0f,0.0f,0.0f);
+	        glUniform1f(prog->getUniform("shine"), 1.0f);
+	        break;
+
+
 		}
 	}
 
@@ -883,7 +1121,7 @@ int main(int argc, char **argv)
 	Application *application = new Application();
 
 	WindowManager *windowManager = new WindowManager();
-	windowManager->init(512, 512);
+	windowManager->init(1024, 1024);
 	windowManager->setEventCallbacks(application);
 	application->windowManager = windowManager;
 
@@ -891,6 +1129,8 @@ int main(int argc, char **argv)
 	application->initTex(resourceDir);
 	application->initParticles();
 	application->initTrees();
+	application->initFruits();
+	application->initDeadTrees();
 	application->initGeom(resourceDir);
 
 	// Loop until the user closes the window.
