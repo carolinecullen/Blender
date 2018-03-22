@@ -2,7 +2,7 @@
 uniform sampler2D Texture0;
 
 in vec2 vTexCoord;
-in float dCo;
+// in float dCo;
 out vec4 Outcolor;
 
 void main() {

@@ -333,7 +333,6 @@ public:
 		skyProg->addUniform("V");
 		skyProg->addUniform("M");
 		skyProg->addUniform("Texture0");
-		skyProg->addUniform("texNum");
 		skyProg->addUniform("lightPos");
 		skyProg->addAttribute("vertPos");
 		skyProg->addAttribute("vertNor");
@@ -605,7 +604,7 @@ public:
 
 		auto Projection = make_shared<MatrixStack>();
 		Projection->pushMatrix();
-		Projection->perspective(45.0f, aspect, 0.01f, 100.0f);
+		Projection->perspective(45.0f, aspect, 0.01f, 1000.0f);
 		MatrixStack *projectionPtr = Projection.get();
 
 
@@ -725,7 +724,6 @@ public:
 				Model->scale(vec3(50, 50.f, 50));
 				glUniformMatrix4fv(skyProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				skyTexture->bind(skyProg->getUniform("Texture0"));
-				glUniform1f(skyProg->getUniform("texNum"), 1);
 				sphereShape->draw(skyProg);
 				Model->popMatrix();	
 				skyTexture->unbind();
