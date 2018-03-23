@@ -120,10 +120,10 @@ GLint Program::getAttribute(const std::string &name) const
 	std::map<std::string, GLint>::const_iterator attribute = attributes.find(name.c_str());
 	if (attribute == attributes.end())
 	{
-		if (isVerbose())
-		{
-			std::cout << name << " is not an attribute variable" << std::endl;
-		}
+		// if (isVerbose())
+		// {
+		// 	std::cout << name << " is not an attribute variable" << std::endl;
+		// }
 		return -1;
 	}
 	return attribute->second;

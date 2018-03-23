@@ -37,6 +37,7 @@ public:
 	shared_ptr<Program> particleProg;
 	shared_ptr<Program> skyProg;
 	shared_ptr<Program> deadTreesProg;
+	shared_ptr<Program> roosterProg;
 
 	// textures 
 
@@ -45,6 +46,7 @@ public:
 	shared_ptr<Texture> groundTexture;
 	shared_ptr<Texture> particleTexture;
 	shared_ptr<Texture> deadTreeTexture;
+	shared_ptr<Texture> roosterTexture;
 
 	//ground info
 	GLuint GrndBuffObj, GrndNorBuffObj, GrndTexBuffObj, GIndxBuffObj;
@@ -62,13 +64,14 @@ public:
 	shared_ptr<Shape> deadTree;
 	shared_ptr<Shape> bean;
 	shared_ptr<Shape> lime;
-	shared_ptr<Shape> strawberries;
 	shared_ptr<Shape> blueberries;
-	shared_ptr<Shape> banana;
-	shared_ptr<Shape> orange;
 
 	vector<shared_ptr<Shape>> blenderShapes;
 	vector<shared_ptr<Shape>> lemonShapes;
+	vector<shared_ptr<Shape>> strawberrieShapes;
+	vector<shared_ptr<Shape>> bananaShapes;
+	vector<shared_ptr<Shape>> orangeShapes;
+	vector<shared_ptr<Shape>> limeShapes;
 
 	// Contains vertex information for OpenGL
 	GLuint GroundVertexArrayID;
@@ -279,7 +282,14 @@ public:
 		particleTexture->init();
 		particleTexture->setUnit(4);
 		particleTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);	
+
+		roosterTexture = make_shared<Texture>();
+		roosterTexture->setFilename(resourceDirectory + "/rooster.png");
+		roosterTexture->init();
+		roosterTexture->setUnit(4);
+		roosterTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);	
 	}
+
 
 	void groundSetUp(const std::string& resourceDirectory)
 	{
@@ -327,6 +337,30 @@ public:
 		deadTreesProg->addAttribute("vertNor");
 		deadTreesProg->addAttribute("vertTex");
 		deadTreesProg->addUniform("lightPos");
+	}
+
+	void roosterSetUp(const std::string& resourceDirectory)
+	{
+		//initialize the textures we might use
+		roosterProg = make_shared<Program>();
+		roosterProg->setVerbose(true);
+		roosterProg->setShaderNames(
+			resourceDirectory + "/rooster_tex_vert.glsl",
+			resourceDirectory + "/rooster_tex_frag.glsl");
+		if (! roosterProg->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		roosterProg->addUniform("P");
+		roosterProg->addUniform("V");
+		roosterProg->addUniform("M");
+		roosterProg->addUniform("Texture0");
+		roosterProg->addUniform("texNum");
+		roosterProg->addAttribute("vertPos");
+		roosterProg->addAttribute("vertNor");
+		roosterProg->addAttribute("vertTex");
+		roosterProg->addUniform("lightPos");
 	}
 
 	void shapeSetUp(const std::string& resourceDirectory)
@@ -409,6 +443,7 @@ public:
 		shapeSetUp(resourceDirectory);
 		groundSetUp(resourceDirectory);
 		deadTreeSetUp(resourceDirectory);
+		roosterSetUp(resourceDirectory);
 		particleSetUp(resourceDirectory);
 	}
 
@@ -549,6 +584,22 @@ public:
 						lemonShapes.push_back(s);
 						break;
 
+					case 2:
+						strawberrieShapes.push_back(s);
+						break;
+
+					case 3:
+						bananaShapes.push_back(s);
+						break;
+
+					case 4:
+						orangeShapes.push_back(s);
+						break;
+
+					case 5:
+						limeShapes.push_back(s);
+						break;
+
 				}
 				
 			}
@@ -566,8 +617,6 @@ public:
 		bushShape->resize();
 		bushShape->init();
 
-		uploadMultipleShapes(resourceDirectory, "blender.obj", 0);
-
 		fallTree = make_shared<Shape>();
 		fallTree->loadMesh(resourceDirectory + "/fallTree.obj");
 		fallTree->resize();
@@ -583,32 +632,27 @@ public:
 		bean->resize();
 		bean->init();
 
-		banana = make_shared<Shape>();
-		banana->loadMesh(resourceDirectory + "/fruits/banana.obj");
-		banana->resize();
-		banana->init();
-
 		blueberries = make_shared<Shape>();
 		blueberries->loadMesh(resourceDirectory + "/fruits/blueberries.obj");
 		blueberries->resize();
 		blueberries->init();
-
-		strawberries = make_shared<Shape>();
-		strawberries->loadMesh(resourceDirectory + "/fruits/strawberries.obj");
-		strawberries->resize();
-		strawberries->init();
 
 		lime = make_shared<Shape>();
 		lime->loadMesh(resourceDirectory + "/fruits/lime.obj");
 		lime->resize();
 		lime->init();
 
+		uploadMultipleShapes(resourceDirectory, "/blender.obj", 0);
+
 		uploadMultipleShapes(resourceDirectory,"/fruits/lemon.obj", 1);
 
-		orange = make_shared<Shape>();
-		orange->loadMesh(resourceDirectory + "/fruits/orange.obj");
-		orange->resize();
-		orange->init();
+		uploadMultipleShapes(resourceDirectory,"/fruits/strawberries.obj", 2);
+
+		uploadMultipleShapes(resourceDirectory,"/fruits/banana.obj", 3);
+
+		uploadMultipleShapes(resourceDirectory,"/fruits/orange.obj", 4);
+
+		uploadMultipleShapes(resourceDirectory,"/fruits/lime.obj", 5);
 
 		// for ground
 		initQuad();
@@ -797,7 +841,7 @@ public:
 
 		auto Projection = make_shared<MatrixStack>();
 		Projection->pushMatrix();
-		Projection->perspective(45.0f, aspect, 0.01f, 1000.0f);
+		Projection->perspective(45.0f, aspect, 0.01f, 250.0f);
 		MatrixStack *projectionPtr = Projection.get();
 
 
@@ -961,7 +1005,7 @@ public:
 			Model->loadIdentity();
 				Model->pushMatrix();
 				Model->rotate(cos(glfwGetTime()/10), vec3(0,1,0));
-				Model->scale(vec3(500, 500.f, 500));
+				Model->scale(vec3(100, 100.f, 100));
 				glUniformMatrix4fv(skyProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				skyTexture->bind(skyProg->getUniform("Texture0"));
 				sunTexture->bind(skyProg->getUniform("Texture1"));
@@ -981,9 +1025,7 @@ public:
 		auto Model = make_shared<MatrixStack>();
 		Program *sProgPtr = shapeProg.get();
 
-		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~ OBJECT PROGRAM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 		shapeProg->bind();
-
 		glUniformMatrix4fv(shapeProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(shapeProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
 		glUniform3f(shapeProg->getUniform("lightPos"), lightPos.x, lightPos.y, lightPos.z);
@@ -1000,79 +1042,157 @@ public:
 				Model->translate(vec3(treePositions[i], treeS/1.60, treePositions[i+2]));
 				Model->scale(vec3(treeS));
 				Model->rotate(treeR, vec3(0, 1, 0));
-				SetMaterial(i % 10, sProgPtr);
+				SetMaterial(i/3 % 15, sProgPtr);
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 				fallTree->draw(shapeProg);
 				Model->popMatrix();
 				
 			}
 
+			// for blender
+			Model->pushMatrix();
+			Model->scale(vec3(100.f,100.f,100.f));
+			Model->translate(vec3(10.0f, 1.0f, .0f));
 			for (size_t i = 0; i < blenderShapes.size(); i++)
 			{
-				Model->pushMatrix();
-				
-				
-				// Model->translate(-2.0f*dummyTrans);
-				Model->translate(vec3(0.0f, 0.0f, 10.0f));
-				Model->scale(vec3(10.f,10.f,10.f));
-				// Model->rotate(radians(-90.f), vec3(1,0,0));
-				// Model->rotate(radians(-90.f), vec3(0,0,1));
-
 				SetMaterial(1, sProgPtr);
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 				blenderShapes[i]->draw(shapeProg);
-				Model->popMatrix();
 			}
+			Model->popMatrix();
 
+			// for strawberries
 			Model->pushMatrix();
-			Model->translate(vec3(0.0, 0.f, 0.0));
+			Model->translate(vec3(6.0f, 0.50f, 0.0f));
+			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+			Model->scale(vec3(0.7f,0.7f,0.7f));
+			for (size_t i = 0; i < strawberrieShapes.size(); i++)
+			{
+
+				if(i == 0)
+				{
+					SetMaterial(7, sProgPtr);
+				}
+				else if (i == 2)
+				{
+					SetMaterial(8, sProgPtr);
+				}
+				else
+				{
+					SetMaterial(6, sProgPtr);
+				}
+				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+				strawberrieShapes[i]->draw(shapeProg);
+			}
+			Model->popMatrix();
+
+			// for the banana
+			Model->pushMatrix();
+			Model->translate(vec3(3.0f, 0.50f, 0.0f));
+			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+			Model->scale(vec3(2.f,2.f,2.f));
+			for (size_t i = 0; i < bananaShapes.size(); i++)
+			{
+
+				if(i==0)
+				{
+					SetMaterial(2, sProgPtr);
+				}
+				else 
+				{
+					SetMaterial(6, sProgPtr);
+				}
+				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+				bananaShapes[i]->draw(shapeProg);
+			}
+			Model->popMatrix();
+
+			// for the blueberries
+			Model->pushMatrix();
+			Model->translate(vec3(0.0, 0.5f, 0.0));
+			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+			Model->scale(vec3(0.3,0.3,0.3));
 			SetMaterial(10, sProgPtr);
 			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 			blueberries->draw(shapeProg);
 			Model->popMatrix();
 
+
+			// for the lime
 			Model->pushMatrix();
-			Model->translate(vec3(5.0, 0.f, 0.0));
-			SetMaterial(15, sProgPtr);
-			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-			banana->draw(shapeProg);
+			Model->translate(vec3(0.0f, 0.50f, 3.0f));
+			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+			Model->scale(vec3(2.f,2.f,2.f));
+			for (size_t i = 0; i < limeShapes.size(); i++)
+			{
+
+				if(i==0)
+				{
+					SetMaterial(8, sProgPtr);
+				}
+				else 
+				{
+					SetMaterial(3, sProgPtr);
+				}
+				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+				limeShapes[i]->draw(shapeProg);
+			}
 			Model->popMatrix();
 
+
+			// for the lemon
 			Model->pushMatrix();
-			Model->translate(vec3(-5.0, 0.f, 0.0));
-			SetMaterial(13, sProgPtr);
-			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-			lime->draw(shapeProg);
-			Model->popMatrix();
+			Model->translate(vec3(3.0f, 0.5f, 3.0f));
+			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+			Model->scale(vec3(0.002,0.002,0.002));
 
 			for (size_t i = 0; i < lemonShapes.size(); i++)
 			{
-				Model->pushMatrix();
-				
-				// Model->scale(dummyScale);
-				// Model->translate(-2.0f*dummyTrans);
-				Model->translate(vec3(10.0f, 0.0f, 0.0f));
-				// Model->rotate(radians(-90.f), vec3(1,0,0));
-				// Model->rotate(radians(-90.f), vec3(0,0,1));
-
-				SetMaterial(1, sProgPtr);
+				if(i==3 || i == 5 || i == 7 || i == 9 || i == 11 || i == 13 || i == 15 || i == 17 || i == 19 || i == 21 || i == 23 || i == 25 || i == 27)
+				{
+					SetMaterial(3, sProgPtr);
+				}
+				else if(i == 4 || i == 6 || i == 8 || i == 10 || i == 12 || i == 14 || i == 16 || i == 18 || i == 20 || i == 22 || i == 24 || i == 26)
+				{
+					SetMaterial(16, sProgPtr);
+				}
+				else if(i == 1)
+				{
+					SetMaterial(6, sProgPtr);
+				}
+				else
+				{
+					SetMaterial(11, sProgPtr);
+				}
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 				lemonShapes[i]->draw(shapeProg);
-				Model->popMatrix();
+				
 			}
-
-			Model->pushMatrix();
-			Model->translate(vec3(-10.0, 0.f, 0.0));
-			SetMaterial(12, sProgPtr);
-			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-			orange->draw(shapeProg);
 			Model->popMatrix();
 
+			// for the orange
 			Model->pushMatrix();
-			Model->translate(vec3(15.0, 0.f, 0.0));
-			SetMaterial(14, sProgPtr);
-			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-			strawberries->draw(shapeProg);
+
+			Model->translate(vec3(6.0f, 0.0f, 3.0f));
+			// Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+			Model->scale(vec3(0.001f, 0.001f, 0.001f));
+			for (size_t i = 0; i < orangeShapes.size(); i++)
+			{
+				if(i == 0)
+				{
+					SetMaterial(12, sProgPtr);
+				}
+				else if(i == 1)
+				{
+					SetMaterial(6, sProgPtr);
+				}
+				else
+				{
+					SetMaterial(8, sProgPtr);
+				}
+				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+				orangeShapes[i]->draw(shapeProg);
+			}
 			Model->popMatrix();
 
 
@@ -1146,23 +1266,23 @@ public:
 	        break;
 
 	    case 10: // blueberries
-	        glUniform3f(prog->getUniform("MatAmb"),  0.105882f, 0.058824f, 0.113725f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.427451f, 0.470588f, 0.541176f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.333333f, 0.333333f, 0.521569f);
+	        glUniform3f(prog->getUniform("MatAmb"),  0.105882f, 0.058824f, 0.313725f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.227451f, 0.270588f, 0.741176f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.233333f, 0.233333f, 0.821569f);
 	        glUniform1f(prog->getUniform("shine"), 9.84615f);
 	        break;
 
 	    case 11: // lemon
-	        glUniform3f(prog->getUniform("MatAmb"),  0.05f,0.05f,0.0f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.5f,0.5f,0.4f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.7f,0.7f,0.04f);
-	        glUniform1f(prog->getUniform("shine"), 10.0f);
+	        glUniform3f(prog->getUniform("MatAmb"), 0.4294, 0.4235, 0.02745);
+		    glUniform3f(prog->getUniform("MatDif"), 0.7804, 0.5686, 0.11373);
+		    glUniform3f(prog->getUniform("MatSpec"), 0.9922, 0.941176, 0.80784);
+		    glUniform1f(prog->getUniform("shine"), 27.9);
 	        break;
 
 	    case 12: // orange
-	        glUniform3f(prog->getUniform("MatAmb"),  0.39125f, 0.135f, 0.0225f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.7038f, 0.27048f, 0.0828f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.256777f, 0.137622f, 0.086014f);
+	        glUniform3f(prog->getUniform("MatAmb"),  0.49125f, 0.135f, 0.0225f);
+	        glUniform3f(prog->getUniform("MatDif"), 0.8038f, 0.37048f, 0.0828f);
+	        glUniform3f(prog->getUniform("MatSpec"), 0.556777f, 0.537622f, 0.286014f);
 	        glUniform1f(prog->getUniform("shine"), 12.8f);
 	        break;
 
@@ -1173,18 +1293,18 @@ public:
 	        glUniform1f(prog->getUniform("shine"), 76.8f);
 	        break;
 
-	    case 14: // strawberries
-	        glUniform3f(prog->getUniform("MatAmb"),  0.1745f, 0.01175f, 0.01175f);
-	        glUniform3f(prog->getUniform("MatDif"), 0.61424f, 0.04136f, 0.04136f);
-	        glUniform3f(prog->getUniform("MatSpec"), 0.727811f, 0.626959f, 0.626959f);
-	        glUniform1f(prog->getUniform("shine"), 76.8f);
-	        break;
-
 	    case 15: // banana
 	        glUniform3f(prog->getUniform("MatAmb"),  0.05f,0.05f,0.0f);
 	        glUniform3f(prog->getUniform("MatDif"), 0.5f,0.5f,0.4f);
 	        glUniform3f(prog->getUniform("MatSpec"), 0.7f,0.7f,0.04f);
-	        glUniform1f(prog->getUniform("shine"), 10.0f);
+	        glUniform1f(prog->getUniform("shine"), 35.0f);
+	        break;
+
+	    case 16: // pith
+	        glUniform3f(prog->getUniform("MatAmb"), 0.7294, 0.7235, 0.2745);
+		    glUniform3f(prog->getUniform("MatDif"), 0.7804, 0.5686, 0.11373);
+		    glUniform3f(prog->getUniform("MatSpec"), 0.9922, 0.941176, 0.80784);
+		    glUniform1f(prog->getUniform("shine"), 27.9);
 	        break;
 
 
