@@ -123,7 +123,7 @@ public:
 	float theta = 90;
 	float prevX;
 	float prevY;
-	vec3 cameraPos = vec3(0.0, 0.0, 5.0);
+	vec3 cameraPos = vec3(0.0, 0.0, -7.0);
 	vec3 lightPos = vec3(0, 500.0, 0);
 
 	float x = PI/2;
@@ -834,37 +834,38 @@ public:
 			actualSpeed *= 3;
 		}
 
+		vec3 holdCameraPos = cameraPos;
+	
 		if(moveForward)
 		{
-			cameraPos += forward * actualSpeed;
+			holdCameraPos = cameraPos + (forward * actualSpeed);	
 		}
 		if(moveBackward)
 		{
-			cameraPos -= forward * actualSpeed;
-
+			holdCameraPos = cameraPos - (forward * actualSpeed);
 		}
 		if(moveLeft)
 		{
-
-			cameraPos -= sides * actualSpeed;
-
+			holdCameraPos = cameraPos - (sides * actualSpeed);
 		}
 		if(moveRight)
 		{
-
-			cameraPos += sides * actualSpeed;
-
+			holdCameraPos = cameraPos + (sides * actualSpeed);
 		}
 
+		bool go = checkForEdge(holdCameraPos);
+
+		if(go)
+		{
+			cameraPos = holdCameraPos;
+		}
 
 		auto ViewUser = make_shared<MatrixStack>();
-
 		ViewUser->pushMatrix();
 			ViewUser->loadIdentity();
 			ViewUser->pushMatrix();
 			ViewUser->lookAt(vec3(cameraPos.x, 1.0, cameraPos.z), forward + vec3(cameraPos.x, 1.0, cameraPos.z), up);
 		MatrixStack *userViewPtr = ViewUser.get();
-		// printf("before bananapos x %f\n", bananaPos[0]);
 
 		checkForFruit(userViewPtr);
 
@@ -872,7 +873,6 @@ public:
 		Projection->pushMatrix();
 		Projection->perspective(45.0f, aspect, 0.01f, 250.0f);
 		MatrixStack *projectionPtr = Projection.get();
-
 
 		CHECKED_GL_CALL(glDisable(GL_DEPTH_TEST));
 		CHECKED_GL_CALL(glDisable(GL_BLEND));
@@ -883,8 +883,12 @@ public:
 		drawGround(userViewPtr, projectionPtr);
 
 		drawDeadTrees(userViewPtr, projectionPtr);
-		drawRooster(userViewPtr, projectionPtr);
 
+		// if(!go)
+		// {
+		// 	drawRooster(userViewPtr, projectionPtr);
+		// }
+		
 		CHECKED_GL_CALL(glEnable(GL_BLEND));
 		CHECKED_GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 		CHECKED_GL_CALL(glPointSize(25.0f));
@@ -893,6 +897,28 @@ public:
 		Projection->popMatrix();
 		ViewUser->popMatrix();
 		ViewUser->popMatrix();	 
+	}
+
+	bool checkForEdge(vec3 hold)
+	{
+		float DistPosX = hold.x - 512.f;
+		float DistNegX = hold.x + 512.f;
+		float DistPosZ = hold.z - 512.f;
+		float DistNegZ = hold.z + 512.f;
+
+		printf("dist pos x %f\n", DistPosX);
+		printf("dist pos z %f\n", DistPosZ);
+		printf("dist neg x %f\n", DistNegX);
+		printf("dist neg z %f\n", DistNegZ);
+
+		if(abs(DistPosZ) <= 5.f || abs(DistPosX) <= 5.f || abs(DistNegX) <= 5.f || abs(DistNegZ) <= 5.f)
+		{
+			return false;
+		}
+		else
+		{
+			return true;
+		}
 	}
 
 	void checkForFruit(MatrixStack* View)
@@ -1296,6 +1322,7 @@ public:
 			Model->pushMatrix();
 			Model->scale(vec3(0.01f,0.01f,0.01f));
 			Model->translate(vec3(0.0f, 1.0f, .0f));
+			Model->rotate(PI, vec3(0.0f, 1.0f, .0f));
 
 			for (size_t i = 0; i < blenderShapes.size(); i++)
 			{
