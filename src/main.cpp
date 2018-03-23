@@ -289,12 +289,6 @@ public:
 		roosterTexture->init();
 		roosterTexture->setUnit(4);
 		roosterTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
-
-		// blenderTexture = make_shared<Texture>();
-		// blenderTexture->setFilename(resourceDirectory + "/blender.png");
-		// blenderTexture->init();
-		// blenderTexture->setUnit(4);
-		// blenderTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);	
 	}
 
 
@@ -940,6 +934,7 @@ public:
 
 		Model->pushMatrix();
 			Model->loadIdentity();
+				Model->translate(vec3(10.f, 0, 0));
 				Model->pushMatrix();
 				glUniformMatrix4fv(roosterProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				roosterTexture->bind(roosterProg->getUniform("Texture0"));
@@ -1072,17 +1067,6 @@ public:
 				
 			}
 
-			// for blender
-			Model->pushMatrix();
-			Model->scale(vec3(0.01f,0.01f,0.01f));
-			Model->translate(vec3(0.0f, 1.0f, .0f));
-			for (size_t i = 0; i < blenderShapes.size(); i++)
-			{
-				SetMaterial(0, sProgPtr);
-				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-				blenderShapes[i]->draw(shapeProg);
-			}
-			Model->popMatrix();
 
 			// for strawberries
 			Model->pushMatrix();
@@ -1217,6 +1201,31 @@ public:
 			Model->popMatrix();
 
 
+			// for blender
+			Model->pushMatrix();
+			Model->scale(vec3(0.01f,0.01f,0.01f));
+			Model->translate(vec3(0.0f, 1.0f, .0f));
+
+			for (size_t i = 0; i < blenderShapes.size(); i++)
+			{
+				if( i == 0)
+				{
+					SetMaterial(6, sProgPtr);
+				}
+				else if(i == 2)
+				{
+					SetMaterial(18, sProgPtr);
+				}
+				else
+				{
+					SetMaterial(17, sProgPtr);
+				}
+				
+				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+				blenderShapes[i]->draw(shapeProg);
+			}
+			Model->popMatrix();
+
 		Model->popMatrix();
 		shapeProg->unbind();
 	}
@@ -1328,6 +1337,19 @@ public:
 		    glUniform1f(prog->getUniform("shine"), 27.9);
 	        break;
 
+	    case 17: // chrome
+	        glUniform3f(prog->getUniform("MatAmb"), 0.25f, 0.25f, 0.25f);
+		    glUniform3f(prog->getUniform("MatDif"), 0.4f, 0.4f, 0.4f);
+		    glUniform3f(prog->getUniform("MatSpec"), 0.774597f, 0.774597f, 0.774597f);
+		    glUniform1f(prog->getUniform("shine"), 76.8f);
+	        break;
+
+	    case 18: // black plastic
+	        glUniform3f(prog->getUniform("MatAmb"), 0.0f, 0.0f, 0.0f);
+		    glUniform3f(prog->getUniform("MatDif"), 0.01f, 0.01f, 0.01f);
+		    glUniform3f(prog->getUniform("MatSpec"), 0.50f, 0.50f, 0.50f);
+		    glUniform1f(prog->getUniform("shine"), 32.0f);
+	        break;
 
 		}
 	}
