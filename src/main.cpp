@@ -884,10 +884,10 @@ public:
 
 		drawDeadTrees(userViewPtr, projectionPtr);
 
-		// if(!go)
-		// {
-		// 	drawRooster(userViewPtr, projectionPtr);
-		// }
+		if(!go)
+		{
+			drawRooster(holdCameraPos, userViewPtr, projectionPtr);
+		}
 		
 		CHECKED_GL_CALL(glEnable(GL_BLEND));
 		CHECKED_GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
@@ -906,12 +906,7 @@ public:
 		float DistPosZ = hold.z - 512.f;
 		float DistNegZ = hold.z + 512.f;
 
-		printf("dist pos x %f\n", DistPosX);
-		printf("dist pos z %f\n", DistPosZ);
-		printf("dist neg x %f\n", DistNegX);
-		printf("dist neg z %f\n", DistNegZ);
-
-		if(abs(DistPosZ) <= 5.f || abs(DistPosX) <= 5.f || abs(DistNegX) <= 5.f || abs(DistNegZ) <= 5.f)
+		if(abs(DistPosZ) <= 10.f || abs(DistPosX) <= 10.f || abs(DistNegX) <= 10.f || abs(DistNegZ) <= 10.f)
 		{
 			return false;
 		}
@@ -1025,8 +1020,9 @@ public:
 		particleProg->unbind();
 	}
 
-	void drawRooster(MatrixStack* View, MatrixStack* Projection)
+	void drawRooster(vec3 hold, MatrixStack* View, MatrixStack* Projection)
 	{
+
 		auto Model = make_shared<MatrixStack>();
 		roosterProg->bind();
 		glUniformMatrix4fv(roosterProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
@@ -1035,7 +1031,32 @@ public:
 
 		Model->pushMatrix();
 			Model->loadIdentity();
-				Model->translate(vec3(10.f, 0, 0));
+
+				float DistPosX = hold.x - 512.f;
+				float DistNegX = hold.x + 512.f;
+				float DistPosZ = hold.z - 512.f;
+
+				if(abs(DistPosX) <= 10.f)
+				{
+					Model->translate(vec3(508.f, 0, hold.z));
+					Model->rotate(180, vec3(0,1,0));
+				}
+				else if(abs(DistPosZ) <= 10.f)
+				{
+					Model->translate(vec3(hold.x, 0, 508.f));
+					Model->rotate(180, vec3(0,1,0));
+				}
+				else if(abs(DistNegX) <= 10.f)
+				{
+					Model->translate(vec3(-508.f, 0, hold.z));
+					Model->rotate(-180, vec3(0,1,0));
+				}
+				else
+				{
+					Model->translate(vec3(hold.x, 0, -508.f));
+
+				}
+
 				Model->pushMatrix();
 				glUniformMatrix4fv(roosterProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
 				roosterTexture->bind(roosterProg->getUniform("Texture0"));

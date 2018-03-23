@@ -9,7 +9,7 @@ void main() {
 
     vec4 texColor0 = texture(Texture0, vTexCoord);
  
-  	Outcolor = dCo*texColor0;
+  	Outcolor = texColor0;
   
 	// Outcolor = vec4(vTexCoord.s, vTexCoord.t, 0, 1);
 }
