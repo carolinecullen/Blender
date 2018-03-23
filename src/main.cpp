@@ -71,10 +71,8 @@ public:
 
 	// Shape to be used (from obj file)
 	shared_ptr<Shape> sphereShape;
-	shared_ptr<Shape> bushShape;
 	shared_ptr<Shape> fallTree;
 	shared_ptr<Shape> deadTree;
-	shared_ptr<Shape> bean;
 	shared_ptr<Shape> lime;
 	shared_ptr<Shape> blueberries;
 	shared_ptr<Shape> rooster;
@@ -621,12 +619,6 @@ public:
 	void initGeom(const std::string& resourceDirectory)
 	{
 
-
-		bushShape = make_shared<Shape>();
-		bushShape->loadMesh(resourceDirectory + "/bush.obj");
-		bushShape->resize();
-		bushShape->init();
-
 		fallTree = make_shared<Shape>();
 		fallTree->loadMesh(resourceDirectory + "/fallTree.obj");
 		fallTree->resize();
@@ -636,11 +628,6 @@ public:
 		deadTree->loadMesh(resourceDirectory + "/deadTree.obj");
 		deadTree->resize();
 		deadTree->init();
-
-		bean = make_shared<Shape>();
-		bean->loadMesh(resourceDirectory + "/beanstalk.obj");
-		bean->resize();
-		bean->init();
 
 		rooster = make_shared<Shape>();
 		rooster->loadMesh(resourceDirectory + "/Rooster.obj");
