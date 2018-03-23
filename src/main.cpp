@@ -31,6 +31,10 @@ public:
 
 	WindowManager * windowManager = nullptr;
 	int width, height;
+
+	bool allFruitCollected = false;
+	bool winner = false;
+
 	// programs
 	shared_ptr<Program> shapeProg;
 	shared_ptr<Program> groundProg;
@@ -38,6 +42,14 @@ public:
 	shared_ptr<Program> skyProg;
 	shared_ptr<Program> deadTreesProg;
 	shared_ptr<Program> roosterProg;
+
+	// collection 
+	bool colBlueberries = false;
+	bool colStrawberries = false;
+	bool colLime = false;
+	bool colLemon = false;
+	bool colOrange = false;
+	bool colBanana = false;
 
 	// textures 
 
@@ -193,7 +205,6 @@ public:
 		else if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_RELEASE)
 		{
 			sprint = false;
-
 		}
 	}
 
@@ -825,13 +836,10 @@ public:
 
 		if(moveForward)
 		{
-			// bool go = checkForCollision(cameraPos, forward, actualSpeed)
 			cameraPos += forward * actualSpeed;
-
 		}
 		if(moveBackward)
 		{
-
 			cameraPos -= forward * actualSpeed;
 
 		}
@@ -848,6 +856,7 @@ public:
 
 		}
 
+
 		auto ViewUser = make_shared<MatrixStack>();
 
 		ViewUser->pushMatrix();
@@ -855,6 +864,9 @@ public:
 			ViewUser->pushMatrix();
 			ViewUser->lookAt(vec3(cameraPos.x, 1.0, cameraPos.z), forward + vec3(cameraPos.x, 1.0, cameraPos.z), up);
 		MatrixStack *userViewPtr = ViewUser.get();
+		// printf("before bananapos x %f\n", bananaPos[0]);
+
+		checkForFruit(userViewPtr);
 
 		auto Projection = make_shared<MatrixStack>();
 		Projection->pushMatrix();
@@ -881,6 +893,69 @@ public:
 		Projection->popMatrix();
 		ViewUser->popMatrix();
 		ViewUser->popMatrix();	 
+	}
+
+	void checkForFruit(MatrixStack* View)
+	{
+
+		float banDistX = cameraPos.x - bananaPos[0];
+		float banDistZ = cameraPos.z - bananaPos[1];
+		float banDist = sqrt((banDistX*banDistX) + (banDistZ*banDistZ));
+
+		if(banDist <= 1.5f)
+		{
+			colBanana = true;
+		}
+
+		float strawDistX = cameraPos.x - strawberriesPos[0];
+		float strawDistZ = cameraPos.z - strawberriesPos[1];
+		float strawDist = sqrt((strawDistX*strawDistX) + (strawDistZ*strawDistZ));
+
+		if(strawDist <= 1.5f)
+		{
+			colStrawberries = true;
+		}
+
+		float blueDistX = cameraPos.x - blueberriesPos[0];
+		float blueDistZ = cameraPos.z - blueberriesPos[1];
+		float blueDist = sqrt((blueDistX*blueDistX) + (blueDistZ*blueDistZ));
+
+		if(blueDist <= 1.5f)
+		{
+			colBlueberries = true;
+		}
+
+		float limeDistX = cameraPos.x - limePos[0];
+		float limeDistZ = cameraPos.z - limePos[1];
+		float limeDist = sqrt((limeDistX*limeDistX) + (limeDistZ*limeDistZ));
+
+		if(limeDist <= 1.5f)
+		{
+			colLime = true;
+		}
+
+		float lemonDistX = cameraPos.x - lemonPos[0];
+		float lemonDistZ = cameraPos.z - lemonPos[1];
+		float lemonDist = sqrt((lemonDistX*lemonDistX) + (lemonDistZ*lemonDistZ));
+
+		if(lemonDist <= 1.5f)
+		{
+			colLemon = true;
+		}
+
+		float orDistX = cameraPos.x - orangePos[0];
+		float orDistZ = cameraPos.z - orangePos[1];
+		float orDist = sqrt((orDistX*orDistX) + (orDistZ*orDistZ));
+
+		if(orDist <= 1.5f)
+		{
+			colOrange = true;
+		}
+
+		if(colOrange && colLemon && colLime && colBlueberries && colStrawberries && colBanana)
+		{
+			allFruitCollected = true;
+		}
 	}
 
 	void drawParticles(MatrixStack* View, float aspect)
@@ -1068,139 +1143,155 @@ public:
 			}
 
 
-			// for strawberries
-			Model->pushMatrix();
-			Model->translate(vec3(strawberriesPos[0], 0.50f, strawberriesPos[1]));
-			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
-			Model->scale(vec3(0.7f,0.7f,0.7f));
-			for (size_t i = 0; i < strawberrieShapes.size(); i++)
+			if(!colStrawberries)
 			{
+				// for strawberries
+				Model->pushMatrix();
+				Model->translate(vec3(strawberriesPos[0], 0.50f, strawberriesPos[1]));
+				Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+				Model->scale(vec3(0.7f,0.7f,0.7f));
+				for (size_t i = 0; i < strawberrieShapes.size(); i++)
+				{
 
-				if(i == 0)
-				{
-					SetMaterial(7, sProgPtr);
+					if(i == 0)
+					{
+						SetMaterial(7, sProgPtr);
+					}
+					else if (i == 2)
+					{
+						SetMaterial(8, sProgPtr);
+					}
+					else
+					{
+						SetMaterial(6, sProgPtr);
+					}
+					glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+					strawberrieShapes[i]->draw(shapeProg);
 				}
-				else if (i == 2)
-				{
-					SetMaterial(8, sProgPtr);
-				}
-				else
-				{
-					SetMaterial(6, sProgPtr);
-				}
-				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-				strawberrieShapes[i]->draw(shapeProg);
+				Model->popMatrix();
 			}
-			Model->popMatrix();
-
-			// for the banana
-			Model->pushMatrix();
-			Model->translate(vec3(bananaPos[0], 0.50f, bananaPos[1]));
-			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
-			Model->scale(vec3(2.f,2.f,2.f));
-			for (size_t i = 0; i < bananaShapes.size(); i++)
+			
+			if(!colBanana)
 			{
+				// for the banana
+				Model->pushMatrix();
+				Model->translate(vec3(bananaPos[0], 0.50f, bananaPos[1]));
+				Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+				Model->scale(vec3(2.f,2.f,2.f));
+				for (size_t i = 0; i < bananaShapes.size(); i++)
+				{
 
-				if(i==0)
-				{
-					SetMaterial(2, sProgPtr);
+					if(i==0)
+					{
+						SetMaterial(2, sProgPtr);
+					}
+					else 
+					{
+						SetMaterial(6, sProgPtr);
+					}
+					glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+					bananaShapes[i]->draw(shapeProg);
 				}
-				else 
-				{
-					SetMaterial(6, sProgPtr);
-				}
-				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-				bananaShapes[i]->draw(shapeProg);
+				Model->popMatrix();
 			}
-			Model->popMatrix();
 
-			// for the blueberries
-			Model->pushMatrix();
-			Model->translate(vec3(blueberriesPos[0], 0.50f, blueberriesPos[1]));
-			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
-			Model->scale(vec3(0.3,0.3,0.3));
-			SetMaterial(10, sProgPtr);
-			glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-			blueberries->draw(shapeProg);
-			Model->popMatrix();
-
-
-			// for the lime
-			Model->pushMatrix();
-			Model->translate(vec3(limePos[0], 0.50f, limePos[1]));
-			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
-			Model->scale(vec3(2.f,2.f,2.f));
-			for (size_t i = 0; i < limeShapes.size(); i++)
+			if(!colBlueberries)
 			{
-
-				if(i==0)
-				{
-					SetMaterial(8, sProgPtr);
-				}
-				else 
-				{
-					SetMaterial(3, sProgPtr);
-				}
+				// for the blueberries
+				Model->pushMatrix();
+				Model->translate(vec3(blueberriesPos[0], 0.50f, blueberriesPos[1]));
+				Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+				Model->scale(vec3(0.3,0.3,0.3));
+				SetMaterial(10, sProgPtr);
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-				limeShapes[i]->draw(shapeProg);
+				blueberries->draw(shapeProg);
+				Model->popMatrix();
 			}
-			Model->popMatrix();
+			
 
-
-			// for the lemon
-			Model->pushMatrix();
-			Model->translate(vec3(lemonPos[0], 0.50f, lemonPos[1]));
-			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
-			Model->scale(vec3(0.002,0.002,0.002));
-
-			for (size_t i = 0; i < lemonShapes.size(); i++)
+			if(!colLime)
 			{
-				if(i==3 || i == 5 || i == 7 || i == 9 || i == 11 || i == 13 || i == 15 || i == 17 || i == 19 || i == 21 || i == 23 || i == 25 || i == 27)
+				// for the lime
+				Model->pushMatrix();
+				Model->translate(vec3(limePos[0], 0.50f, limePos[1]));
+				Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+				Model->scale(vec3(2.f,2.f,2.f));
+				for (size_t i = 0; i < limeShapes.size(); i++)
 				{
-					SetMaterial(3, sProgPtr);
-				}
-				else if(i == 4 || i == 6 || i == 8 || i == 10 || i == 12 || i == 14 || i == 16 || i == 18 || i == 20 || i == 22 || i == 24 || i == 26)
-				{
-					SetMaterial(16, sProgPtr);
-				}
-				else if(i == 1)
-				{
-					SetMaterial(6, sProgPtr);
-				}
-				else
-				{
-					SetMaterial(11, sProgPtr);
-				}
-				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-				lemonShapes[i]->draw(shapeProg);
-				
-			}
-			Model->popMatrix();
 
-			// for the orange
-			Model->pushMatrix();
-			Model->translate(vec3(orangePos[0], 0.0f, orangePos[1]));
-			Model->scale(vec3(0.001f, 0.001f, 0.001f));
-			for (size_t i = 0; i < orangeShapes.size(); i++)
+					if(i==0)
+					{
+						SetMaterial(8, sProgPtr);
+					}
+					else 
+					{
+						SetMaterial(3, sProgPtr);
+					}
+					glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+					limeShapes[i]->draw(shapeProg);
+				}
+				Model->popMatrix();
+			}
+
+			if(!colLemon)
 			{
-				if(i == 0)
+				// for the lemon
+				Model->pushMatrix();
+				Model->translate(vec3(lemonPos[0], 0.50f, lemonPos[1]));
+				Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+				Model->scale(vec3(0.002,0.002,0.002));
+
+				for (size_t i = 0; i < lemonShapes.size(); i++)
 				{
-					SetMaterial(12, sProgPtr);
+					if(i==3 || i == 5 || i == 7 || i == 9 || i == 11 || i == 13 || i == 15 || i == 17 || i == 19 || i == 21 || i == 23 || i == 25 || i == 27)
+					{
+						SetMaterial(3, sProgPtr);
+					}
+					else if(i == 4 || i == 6 || i == 8 || i == 10 || i == 12 || i == 14 || i == 16 || i == 18 || i == 20 || i == 22 || i == 24 || i == 26)
+					{
+						SetMaterial(16, sProgPtr);
+					}
+					else if(i == 1)
+					{
+						SetMaterial(6, sProgPtr);
+					}
+					else
+					{
+						SetMaterial(11, sProgPtr);
+					}
+					glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+					lemonShapes[i]->draw(shapeProg);
+					
 				}
-				else if(i == 1)
-				{
-					SetMaterial(6, sProgPtr);
-				}
-				else
-				{
-					SetMaterial(8, sProgPtr);
-				}
-				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
-				orangeShapes[i]->draw(shapeProg);
+				Model->popMatrix();
 			}
-			Model->popMatrix();
-
-
+			
+			if(!colOrange)
+			{
+				// for the orange
+				Model->pushMatrix();
+				Model->translate(vec3(orangePos[0], 0.0f, orangePos[1]));
+				Model->scale(vec3(0.001f, 0.001f, 0.001f));
+				for (size_t i = 0; i < orangeShapes.size(); i++)
+				{
+					if(i == 0)
+					{
+						SetMaterial(12, sProgPtr);
+					}
+					else if(i == 1)
+					{
+						SetMaterial(6, sProgPtr);
+					}
+					else
+					{
+						SetMaterial(8, sProgPtr);
+					}
+					glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
+					orangeShapes[i]->draw(shapeProg);
+				}
+				Model->popMatrix();
+			}
+			
 			// for blender
 			Model->pushMatrix();
 			Model->scale(vec3(0.01f,0.01f,0.01f));
