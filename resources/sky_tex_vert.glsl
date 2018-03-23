@@ -18,12 +18,8 @@ void main() {
   vec4 texPos =  M * vec4(vertPos, 1.0);
   fragNor = (M * vec4(vertNor, 0.0)).xyz;
 
-  /* First model transforms */
   gl_Position = P * V * texPos;
   vertex = V * vec4(gl_Position.xyz, 1.0);
 
-  /* diffuse coefficient for a directional light */
-  // dCo = max(dot(fragNor, normalize(lightPos)), 0);
-  /* pass through the texture coordinates to be interpolated */
   vTexCoord = vertTex;
 }

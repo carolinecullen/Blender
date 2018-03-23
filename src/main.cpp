@@ -47,6 +47,7 @@ public:
 	shared_ptr<Texture> particleTexture;
 	shared_ptr<Texture> deadTreeTexture;
 	shared_ptr<Texture> roosterTexture;
+	shared_ptr<Texture> blenderTexture;
 
 	//ground info
 	GLuint GrndBuffObj, GrndNorBuffObj, GrndTexBuffObj, GIndxBuffObj;
@@ -58,13 +59,13 @@ public:
 
 	// Shape to be used (from obj file)
 	shared_ptr<Shape> sphereShape;
-	shared_ptr<Shape> bunnyShape;
 	shared_ptr<Shape> bushShape;
 	shared_ptr<Shape> fallTree;
 	shared_ptr<Shape> deadTree;
 	shared_ptr<Shape> bean;
 	shared_ptr<Shape> lime;
 	shared_ptr<Shape> blueberries;
+	shared_ptr<Shape> rooster;
 
 	vector<shared_ptr<Shape>> blenderShapes;
 	vector<shared_ptr<Shape>> lemonShapes;
@@ -272,7 +273,7 @@ public:
 		groundTexture->setWrapModes(GL_REPEAT, GL_REPEAT);
 
 		deadTreeTexture = make_shared<Texture>();
-		deadTreeTexture->setFilename(resourceDirectory + "/nightSky.JPG");
+		deadTreeTexture->setFilename(resourceDirectory + "/nightSky.jpg");
 		deadTreeTexture->init();
 		deadTreeTexture->setUnit(3);
 		deadTreeTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
@@ -287,7 +288,13 @@ public:
 		roosterTexture->setFilename(resourceDirectory + "/rooster.png");
 		roosterTexture->init();
 		roosterTexture->setUnit(4);
-		roosterTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);	
+		roosterTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+
+		// blenderTexture = make_shared<Texture>();
+		// blenderTexture->setFilename(resourceDirectory + "/blender.png");
+		// blenderTexture->init();
+		// blenderTexture->setUnit(4);
+		// blenderTexture->setWrapModes(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);	
 	}
 
 
@@ -437,7 +444,6 @@ public:
 
 		glClearColor(.12f, .34f, .56f, 1.0f);
 		glEnable(GL_DEPTH_TEST);
-
 		
 		skySetUp(resourceDirectory);
 		shapeSetUp(resourceDirectory);
@@ -605,7 +611,6 @@ public:
 			}
 
 		}
-
 	}
 
 	void initGeom(const std::string& resourceDirectory)
@@ -632,26 +637,21 @@ public:
 		bean->resize();
 		bean->init();
 
+		rooster = make_shared<Shape>();
+		rooster->loadMesh(resourceDirectory + "/Rooster.obj");
+		rooster->resize();
+		rooster->init();
+
 		blueberries = make_shared<Shape>();
 		blueberries->loadMesh(resourceDirectory + "/fruits/blueberries.obj");
 		blueberries->resize();
 		blueberries->init();
 
-		lime = make_shared<Shape>();
-		lime->loadMesh(resourceDirectory + "/fruits/lime.obj");
-		lime->resize();
-		lime->init();
-
 		uploadMultipleShapes(resourceDirectory, "/blender.obj", 0);
-
 		uploadMultipleShapes(resourceDirectory,"/fruits/lemon.obj", 1);
-
 		uploadMultipleShapes(resourceDirectory,"/fruits/strawberries.obj", 2);
-
 		uploadMultipleShapes(resourceDirectory,"/fruits/banana.obj", 3);
-
 		uploadMultipleShapes(resourceDirectory,"/fruits/orange.obj", 4);
-
 		uploadMultipleShapes(resourceDirectory,"/fruits/lime.obj", 5);
 
 		// for ground
@@ -779,6 +779,29 @@ public:
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
 	}
 
+	void renderGround()
+	{
+
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, GrndBuffObj);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glEnableVertexAttribArray(1);
+		glBindBuffer(GL_ARRAY_BUFFER, GrndNorBuffObj);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glEnableVertexAttribArray(2);
+		glBindBuffer(GL_ARRAY_BUFFER, GrndTexBuffObj);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, GIndxBuffObj);
+		glDrawElements(GL_TRIANGLES, gGiboLen, GL_UNSIGNED_SHORT, 0);
+
+		glDisableVertexAttribArray(0);
+		glDisableVertexAttribArray(1);
+		glDisableVertexAttribArray(2);
+	}
+
 	void render()
 	{
 
@@ -854,6 +877,7 @@ public:
 		drawGround(userViewPtr, projectionPtr);
 
 		drawDeadTrees(userViewPtr, projectionPtr);
+		drawRooster(userViewPtr, projectionPtr);
 
 		CHECKED_GL_CALL(glEnable(GL_BLEND));
 		CHECKED_GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
@@ -894,7 +918,6 @@ public:
 
 		CHECKED_GL_CALL(glVertexAttribDivisor(0, 1));
 		CHECKED_GL_CALL(glVertexAttribDivisor(1, 1));
-		// Draw the points !
 		CHECKED_GL_CALL(glDrawArraysInstanced(GL_POINTS, 0, 1, numP));
 
 		CHECKED_GL_CALL(glVertexAttribDivisor(0, 0));
@@ -907,27 +930,27 @@ public:
 		particleProg->unbind();
 	}
 
-	void renderGround()
+	void drawRooster(MatrixStack* View, MatrixStack* Projection)
 	{
+		auto Model = make_shared<MatrixStack>();
+		roosterProg->bind();
+		glUniformMatrix4fv(roosterProg->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
+		glUniformMatrix4fv(roosterProg->getUniform("V"), 1, GL_FALSE, value_ptr(View->topMatrix()));
+		glUniform3f(roosterProg->getUniform("lightPos"), lightPos.x, lightPos.y, lightPos.z);
 
-		glEnableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, GrndBuffObj);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		Model->pushMatrix();
+			Model->loadIdentity();
+				Model->pushMatrix();
+				glUniformMatrix4fv(roosterProg->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()) );
+				roosterTexture->bind(roosterProg->getUniform("Texture0"));
+				glUniform1f(roosterProg->getUniform("texNum"), 1);
+				rooster->draw(roosterProg);
+				Model->popMatrix();	
+				roosterTexture->unbind();
 
-		glEnableVertexAttribArray(1);
-		glBindBuffer(GL_ARRAY_BUFFER, GrndNorBuffObj);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-		glEnableVertexAttribArray(2);
-		glBindBuffer(GL_ARRAY_BUFFER, GrndTexBuffObj);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, GIndxBuffObj);
-		glDrawElements(GL_TRIANGLES, gGiboLen, GL_UNSIGNED_SHORT, 0);
-
-		glDisableVertexAttribArray(0);
-		glDisableVertexAttribArray(1);
-		glDisableVertexAttribArray(2);
+		Model->popMatrix();
+		roosterProg->unbind();
 	}
 
 	void drawGround(MatrixStack* View, MatrixStack* Projection)
@@ -1042,7 +1065,7 @@ public:
 				Model->translate(vec3(treePositions[i], treeS/1.60, treePositions[i+2]));
 				Model->scale(vec3(treeS));
 				Model->rotate(treeR, vec3(0, 1, 0));
-				SetMaterial(i/3 % 15, sProgPtr);
+				SetMaterial(i/3 % 16, sProgPtr);
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 				fallTree->draw(shapeProg);
 				Model->popMatrix();
@@ -1051,11 +1074,11 @@ public:
 
 			// for blender
 			Model->pushMatrix();
-			Model->scale(vec3(100.f,100.f,100.f));
-			Model->translate(vec3(10.0f, 1.0f, .0f));
+			Model->scale(vec3(0.01f,0.01f,0.01f));
+			Model->translate(vec3(0.0f, 1.0f, .0f));
 			for (size_t i = 0; i < blenderShapes.size(); i++)
 			{
-				SetMaterial(1, sProgPtr);
+				SetMaterial(0, sProgPtr);
 				glUniformMatrix4fv(shapeProg->getUniform("M"), 1, GL_FALSE,value_ptr(Model->topMatrix()) );
 				blenderShapes[i]->draw(shapeProg);
 			}
@@ -1063,7 +1086,7 @@ public:
 
 			// for strawberries
 			Model->pushMatrix();
-			Model->translate(vec3(6.0f, 0.50f, 0.0f));
+			Model->translate(vec3(strawberriesPos[0], 0.50f, strawberriesPos[1]));
 			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
 			Model->scale(vec3(0.7f,0.7f,0.7f));
 			for (size_t i = 0; i < strawberrieShapes.size(); i++)
@@ -1088,7 +1111,7 @@ public:
 
 			// for the banana
 			Model->pushMatrix();
-			Model->translate(vec3(3.0f, 0.50f, 0.0f));
+			Model->translate(vec3(bananaPos[0], 0.50f, bananaPos[1]));
 			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
 			Model->scale(vec3(2.f,2.f,2.f));
 			for (size_t i = 0; i < bananaShapes.size(); i++)
@@ -1109,7 +1132,7 @@ public:
 
 			// for the blueberries
 			Model->pushMatrix();
-			Model->translate(vec3(0.0, 0.5f, 0.0));
+			Model->translate(vec3(blueberriesPos[0], 0.50f, blueberriesPos[1]));
 			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
 			Model->scale(vec3(0.3,0.3,0.3));
 			SetMaterial(10, sProgPtr);
@@ -1120,7 +1143,7 @@ public:
 
 			// for the lime
 			Model->pushMatrix();
-			Model->translate(vec3(0.0f, 0.50f, 3.0f));
+			Model->translate(vec3(limePos[0], 0.50f, limePos[1]));
 			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
 			Model->scale(vec3(2.f,2.f,2.f));
 			for (size_t i = 0; i < limeShapes.size(); i++)
@@ -1142,7 +1165,7 @@ public:
 
 			// for the lemon
 			Model->pushMatrix();
-			Model->translate(vec3(3.0f, 0.5f, 3.0f));
+			Model->translate(vec3(lemonPos[0], 0.50f, lemonPos[1]));
 			Model->rotate(glfwGetTime()/2, vec3(0,1,0));
 			Model->scale(vec3(0.002,0.002,0.002));
 
@@ -1172,9 +1195,7 @@ public:
 
 			// for the orange
 			Model->pushMatrix();
-
-			Model->translate(vec3(6.0f, 0.0f, 3.0f));
-			// Model->rotate(glfwGetTime()/2, vec3(0,1,0));
+			Model->translate(vec3(orangePos[0], 0.0f, orangePos[1]));
 			Model->scale(vec3(0.001f, 0.001f, 0.001f));
 			for (size_t i = 0; i < orangeShapes.size(); i++)
 			{
